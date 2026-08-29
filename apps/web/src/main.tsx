@@ -2,7 +2,9 @@ import React,{useEffect,useMemo,useState} from 'react';
 import {createRoot} from 'react-dom/client';
 import {ReactFlow,Background,Controls,MiniMap,addEdge,useEdgesState,useNodesState,Connection,Node,Edge,Handle,Position} from '@xyflow/react';
 import '@xyflow/react/dist/style.css'; import './style.css';
-const API=import.meta.env.VITE_API_URL||'';
+const API = import.meta.env.VITE_API_URL
+  ? `https://${import.meta.env.VITE_API_URL.replace(/^https?:\/\//, '')}`
+  : '';
 async function api(path:string,opts:RequestInit={}){const token=localStorage.getItem('iot_token');const r=await fetch(API+path,{...opts,headers:{'content-type':'application/json',...(token?{authorization:`Bearer ${token}`}:{}) ,...(opts.headers||{})}});const data=await r.json().catch(()=>({}));if(!r.ok)throw new Error(data.error||`HTTP ${r.status}`);return data}
 const palette=[['mqtt.trigger','MQTT Trigger'],['webhook.trigger','Webhook Trigger'],['logic.if','IF / Condition'],['logic.filter','Filter'],['action.telegram.send','Telegram'],['action.discord.send','Discord'],['action.email.send','Email'],['action.webhook.send','HTTP Webhook'],['iot.mqtt.publish','MQTT Publish'],['event.trigger','Event Trigger']];
 function App(){const[token,setToken]=useState(localStorage.getItem('iot_token'));const[page,setPage]=useState('dashboard');const[project,setProject]=useState<any>(null);const[projects,setProjects]=useState<any[]>([]);const[events,setEvents]=useState<any[]>([]);useEffect(()=>{if(token)api('/api/projects').then((p)=>{setProjects(p);if(p[0])api(`/api/projects/${p[0].id}/devices`).then(ds=>setProject({...p[0],__deviceToken:ds[0]?.token||''}))}).catch(()=>{localStorage.removeItem('iot_token');setToken(null)})},[token]);useEffect(()=>{if(!project)return;const devicesUrl=`${API||location.origin}/v1/events?token=${encodeURIComponent(projectDeviceToken(project))}`;let es:any;api(`/api/projects/${project.id}/devices`).then(ds=>{if(ds[0]){es=new EventSource(devicesUrl);es.onmessage=(e:any)=>setEvents(v=>[JSON.parse(e.data),...v].slice(0,100))}}).catch(()=>{});return()=>es?.close()},[project]);
