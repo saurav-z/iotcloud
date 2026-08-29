@@ -1,5 +1,6 @@
 import Fastify from 'fastify';
 import jwt from '@fastify/jwt';
+import cors from '@fastify/cors';
 import websocket from '@fastify/websocket';
 import bcrypt from 'bcryptjs';
 import { Aedes } from 'aedes';
@@ -52,41 +53,6 @@ if (!FRONTEND_ORIGIN) {
  * ============================================================
  */
 
-await app.register(jwt, {
-  secret: JWT_SECRET,
-});
-
-await app.register(websocket, {
-  options: {
-    maxPayload: 1024 * 1024,
-    perMessageDeflate: true,
-  },
-});
-
-/*
- * ============================================================
- * CORS
- * ============================================================
- *
- * Authentication:
- *
- *   /api/auth/*
- *
- * is restricted to the configured frontend.
- *
- * Everything else:
- *
- *   *
- *
- * This is intentional because external dashboards,
- * IoT devices, integrations and other services may connect
- * to the API from different origins.
- *
- * WebSockets are not governed by browser CORS in the same
- * way as fetch/XHR. Authentication for WebSocket connections
- * is performed using the device token.
- */
-
 function isAuthRoute(url: string): boolean {
   const pathname = url.split('?')[0];
 
@@ -100,71 +66,33 @@ function isAuthRoute(url: string): boolean {
 app.addHook('onRequest', async (req, reply) => {
   const origin = req.headers.origin;
 
-  /*
-   * Requests from curl, IoT devices and server-to-server
-   * clients normally do not contain an Origin header.
-   */
   if (!origin) {
-    if (req.method === 'OPTIONS') {
-      return reply.code(204).send();
-    }
-
     return;
   }
 
-  /*
-   * Authentication endpoints:
-   * frontend origin ONLY.
-   */
-  if (isAuthRoute(req.url)) {
-    if (origin !== FRONTEND_ORIGIN) {
-      return reply.code(403).send({
-        error: 'origin not allowed',
-      });
-    }
-
-    reply.header(
-      'Access-Control-Allow-Origin',
-      FRONTEND_ORIGIN,
-    );
-  } else {
-    /*
-     * All other HTTP endpoints:
-     * any origin.
-     */
-    reply.header(
-      'Access-Control-Allow-Origin',
-      '*',
-    );
+  if (isAuthRoute(req.url) && origin !== FRONTEND_ORIGIN) {
+    return reply.code(403).send({
+      error: 'origin not allowed',
+    });
   }
+});
 
-  reply.header(
-    'Access-Control-Allow-Methods',
-    'GET,POST,PUT,PATCH,DELETE,OPTIONS',
-  );
+await app.register(jwt, {
+  secret: JWT_SECRET,
+});
 
-  reply.header(
-    'Access-Control-Allow-Headers',
-    'Content-Type, Authorization, X-Webhook-Secret',
-  );
+await app.register(websocket, {
+  options: {
+    maxPayload: 1024 * 1024,
+    perMessageDeflate: true,
+  },
+});
 
-  reply.header(
-    'Access-Control-Max-Age',
-    '86400',
-  );
-
-  /*
-   * Important for requests where the allowed origin is
-   * dynamically determined.
-   */
-  reply.header('Vary', 'Origin');
-
-  /*
-   * Browser preflight.
-   */
-  if (req.method === 'OPTIONS') {
-    return reply.code(204).send();
-  }
+await app.register(cors, {
+  origin: true,
+  methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Webhook-Secret'],
+  maxAge: 86400,
 });
 
 /*
