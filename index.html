@@ -1,0 +1,1045 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>IoTCloud Realtime Dashboard</title>
+
+  <style>
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      font-family: Inter, Arial, sans-serif;
+      background: #0b1120;
+      color: #e5e7eb;
+    }
+
+    .app {
+      min-height: 100vh;
+      display: flex;
+    }
+
+    /* Sidebar */
+    .sidebar {
+      width: 240px;
+      background: #111827;
+      border-right: 1px solid #1f2937;
+      padding: 22px 16px;
+      flex-shrink: 0;
+    }
+
+    .logo {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-size: 20px;
+      font-weight: 700;
+      margin-bottom: 8px;
+    }
+
+    .logo-icon {
+      width: 34px;
+      height: 34px;
+      display: grid;
+      place-items: center;
+      background: #2563eb;
+      border-radius: 9px;
+    }
+
+    .project {
+      color: #9ca3af;
+      font-size: 13px;
+      margin: 0 0 28px 44px;
+    }
+
+    .nav {
+      display: grid;
+      gap: 6px;
+    }
+
+    .nav-item {
+      padding: 11px 12px;
+      border-radius: 8px;
+      color: #9ca3af;
+      cursor: pointer;
+    }
+
+    .nav-item:hover,
+    .nav-item.active {
+      color: white;
+      background: #1f2937;
+    }
+
+    /* Main */
+    .main {
+      flex: 1;
+      min-width: 0;
+    }
+
+    header {
+      height: 70px;
+      border-bottom: 1px solid #1f2937;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 28px;
+      background: #0f172a;
+    }
+
+    .header-title {
+      font-size: 18px;
+      font-weight: 600;
+    }
+
+    .connection {
+      display: flex;
+      align-items: center;
+      gap: 9px;
+      font-size: 13px;
+      color: #9ca3af;
+    }
+
+    .dot {
+      width: 9px;
+      height: 9px;
+      border-radius: 50%;
+      background: #ef4444;
+      box-shadow: 0 0 10px rgba(239, 68, 68, .5);
+    }
+
+    .dot.connected {
+      background: #22c55e;
+      box-shadow: 0 0 10px rgba(34, 197, 94, .6);
+    }
+
+    .content {
+      padding: 28px;
+      max-width: 1400px;
+      margin: auto;
+    }
+
+    .welcome {
+      margin-bottom: 25px;
+    }
+
+    .welcome h1 {
+      margin: 0 0 6px;
+      font-size: 27px;
+    }
+
+    .welcome p {
+      margin: 0;
+      color: #94a3b8;
+    }
+
+    /* Cards */
+    .cards {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 16px;
+      margin-bottom: 20px;
+    }
+
+    .card {
+      background: #111827;
+      border: 1px solid #1f2937;
+      border-radius: 12px;
+      padding: 20px;
+    }
+
+    .card-label {
+      color: #94a3b8;
+      font-size: 13px;
+      margin-bottom: 10px;
+    }
+
+    .card-value {
+      font-size: 29px;
+      font-weight: 700;
+    }
+
+    .card-sub {
+      color: #64748b;
+      font-size: 12px;
+      margin-top: 6px;
+    }
+
+    /* Layout */
+    .grid {
+      display: grid;
+      grid-template-columns: 1.4fr .8fr;
+      gap: 20px;
+    }
+
+    .panel {
+      background: #111827;
+      border: 1px solid #1f2937;
+      border-radius: 12px;
+      overflow: hidden;
+    }
+
+    .panel-header {
+      padding: 17px 20px;
+      border-bottom: 1px solid #1f2937;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .panel-title {
+      font-weight: 600;
+    }
+
+    .panel-body {
+      padding: 20px;
+    }
+
+    /* Data */
+    .data-box {
+      background: #020617;
+      border: 1px solid #1e293b;
+      border-radius: 9px;
+      min-height: 230px;
+      padding: 16px;
+      overflow: auto;
+      font-family: monospace;
+      font-size: 13px;
+      color: #93c5fd;
+      white-space: pre-wrap;
+      word-break: break-word;
+    }
+
+    /* Controls */
+    label {
+      display: block;
+      color: #94a3b8;
+      font-size: 12px;
+      margin-bottom: 7px;
+    }
+
+    input,
+    textarea,
+    select {
+      width: 100%;
+      background: #020617;
+      border: 1px solid #334155;
+      border-radius: 7px;
+      color: white;
+      padding: 11px 12px;
+      outline: none;
+      margin-bottom: 15px;
+      font: inherit;
+    }
+
+    input:focus,
+    textarea:focus {
+      border-color: #3b82f6;
+    }
+
+    textarea {
+      min-height: 130px;
+      resize: vertical;
+      font-family: monospace;
+      font-size: 13px;
+    }
+
+    button {
+      border: 0;
+      border-radius: 7px;
+      padding: 11px 16px;
+      color: white;
+      background: #2563eb;
+      cursor: pointer;
+      font-weight: 600;
+    }
+
+    button:hover {
+      background: #1d4ed8;
+    }
+
+    button.secondary {
+      background: #374151;
+    }
+
+    button.danger {
+      background: #dc2626;
+    }
+
+    .button-row {
+      display: flex;
+      gap: 9px;
+      flex-wrap: wrap;
+    }
+
+    /* Activity */
+    .activity {
+      max-height: 300px;
+      overflow-y: auto;
+    }
+
+    .event {
+      padding: 12px 0;
+      border-bottom: 1px solid #1f2937;
+    }
+
+    .event:last-child {
+      border-bottom: 0;
+    }
+
+    .event-time {
+      color: #64748b;
+      font-size: 11px;
+      margin-bottom: 4px;
+    }
+
+    .event-data {
+      font-family: monospace;
+      font-size: 12px;
+      color: #cbd5e1;
+      white-space: pre-wrap;
+      word-break: break-word;
+    }
+
+    .badge {
+      padding: 4px 8px;
+      border-radius: 20px;
+      font-size: 11px;
+      background: #172554;
+      color: #93c5fd;
+    }
+
+    /* Mobile */
+    @media (max-width: 900px) {
+      .sidebar {
+        display: none;
+      }
+
+      .cards {
+        grid-template-columns: repeat(2, 1fr);
+      }
+
+      .grid {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    @media (max-width: 550px) {
+      .content {
+        padding: 16px;
+      }
+
+      header {
+        padding: 0 16px;
+      }
+
+      .cards {
+        grid-template-columns: 1fr;
+      }
+    }
+  </style>
+</head>
+
+<body>
+
+<div class="app">
+
+  <aside class="sidebar">
+    <div class="logo">
+      <div class="logo-icon">☁</div>
+      IoTCloud
+    </div>
+
+    <div class="project">PROJECT / iotclass</div>
+
+    <nav class="nav">
+      <div class="nav-item active">⌂ &nbsp; Dashboard</div>
+      <div class="nav-item">◉ &nbsp; Devices</div>
+      <div class="nav-item">⌘ &nbsp; Workflows</div>
+      <div class="nav-item">&lt;/&gt; &nbsp; Developer</div>
+      <div class="nav-item">⚿ &nbsp; Credentials</div>
+      <div class="nav-item">⚙ &nbsp; Settings</div>
+    </nav>
+  </aside>
+
+  <main class="main">
+
+    <header>
+      <div class="header-title">Realtime Dashboard</div>
+
+      <div class="connection">
+        <span id="statusDot" class="dot"></span>
+        <span id="statusText">Disconnected</span>
+      </div>
+    </header>
+
+    <section class="content">
+
+      <div class="welcome">
+        <h1>IoT Realtime Data</h1>
+        <p>
+          Open this HTML file in multiple browser tabs/windows.
+          Data published by one instance will appear in all connected instances.
+        </p>
+      </div>
+
+      <div class="cards">
+
+        <div class="card">
+          <div class="card-label">Connection</div>
+          <div class="card-value" id="connectionCard">Offline</div>
+          <div class="card-sub">IoTCloud WebSocket</div>
+        </div>
+
+        <div class="card">
+          <div class="card-label">Messages Received</div>
+          <div class="card-value" id="receivedCount">0</div>
+          <div class="card-sub">Realtime messages</div>
+        </div>
+
+        <div class="card">
+          <div class="card-label">Messages Sent</div>
+          <div class="card-value" id="sentCount">0</div>
+          <div class="card-sub">This browser instance</div>
+        </div>
+
+        <div class="card">
+          <div class="card-label">Last Temperature</div>
+          <div class="card-value" id="temperature">--</div>
+          <div class="card-sub">Shared telemetry</div>
+        </div>
+
+      </div>
+
+      <div class="grid">
+
+        <!-- Live data -->
+        <div class="panel">
+
+          <div class="panel-header">
+            <span class="panel-title">Live Shared Data</span>
+            <span class="badge" id="topicBadge">telemetry</span>
+          </div>
+
+          <div class="panel-body">
+
+            <div id="dataBox" class="data-box">
+Waiting for realtime data...
+            </div>
+
+            <br />
+
+            <div class="button-row">
+              <button onclick="sendExample()">
+                Send Example Data
+              </button>
+
+              <button class="secondary" onclick="clearActivity()">
+                Clear Activity
+              </button>
+            </div>
+
+          </div>
+
+        </div>
+
+        <!-- Publisher -->
+        <div class="panel">
+
+          <div class="panel-header">
+            <span class="panel-title">Publish Data</span>
+          </div>
+
+          <div class="panel-body">
+
+            <label>Topic</label>
+            <input
+              id="topicInput"
+              value="telemetry"
+              placeholder="telemetry"
+            />
+
+            <label>JSON Data</label>
+
+            <textarea id="jsonInput">{
+  "temperature": 28.4,
+  "humidity": 60,
+  "source": "dashboard"
+}</textarea>
+
+            <div class="button-row">
+              <button onclick="publishData()">
+                Publish
+              </button>
+
+              <button
+                class="secondary"
+                onclick="sendExample()">
+                Example
+              </button>
+            </div>
+
+            <br />
+
+            <small id="publishStatus" style="color:#64748b;">
+              Ready
+            </small>
+
+          </div>
+
+        </div>
+
+      </div>
+
+      <br />
+
+      <!-- Activity -->
+      <div class="panel">
+
+        <div class="panel-header">
+          <span class="panel-title">Realtime Activity</span>
+          <span class="badge" id="eventCount">0 events</span>
+        </div>
+
+        <div class="panel-body">
+          <div id="activity" class="activity"></div>
+        </div>
+
+      </div>
+
+    </section>
+
+  </main>
+
+</div>
+
+
+<script>
+/*
+ * ============================================================
+ * IoTCloud Configuration
+ * ============================================================
+ */
+
+const CONFIG = {
+
+  projectId:
+    "6e488f3a-68f6-4e6a-bc78-af99f4d2de81",
+
+  deviceId:
+    "c0bba867-be36-4ca6-9ca9-457a6054228d",
+
+  deviceToken:
+    "dev_5gty5HmDH2MZRPyzheW-X4wIEIVwVR8O",
+
+  websocket:
+    "wss://iotcloud-api-vgv8.onrender.com/v1/ws",
+
+  publish:
+    "http://iotcloud-api-vgv8.onrender.com/api/device/publish",
+
+  defaultTopic:
+    "telemetry"
+};
+
+
+/*
+ * ============================================================
+ * State
+ * ============================================================
+ */
+
+let ws = null;
+
+let received = 0;
+let sent = 0;
+let events = 0;
+
+let reconnectTimer = null;
+
+
+/*
+ * ============================================================
+ * UI helpers
+ * ============================================================
+ */
+
+function setConnection(connected) {
+
+  const dot = document.getElementById("statusDot");
+  const text = document.getElementById("statusText");
+  const card = document.getElementById("connectionCard");
+
+  if (connected) {
+
+    dot.classList.add("connected");
+    text.textContent = "Connected";
+    card.textContent = "Online";
+
+  } else {
+
+    dot.classList.remove("connected");
+    text.textContent = "Disconnected";
+    card.textContent = "Offline";
+  }
+}
+
+
+function addActivity(type, data) {
+
+  events++;
+
+  document.getElementById("eventCount").textContent =
+    events + (events === 1 ? " event" : " events");
+
+  const container = document.getElementById("activity");
+
+  const item = document.createElement("div");
+  item.className = "event";
+
+  const time = new Date().toLocaleTimeString();
+
+  item.innerHTML = `
+    <div class="event-time">
+      ${escapeHtml(time)} · ${escapeHtml(type)}
+    </div>
+
+    <div class="event-data">
+${escapeHtml(
+  typeof data === "string"
+    ? data
+    : JSON.stringify(data, null, 2)
+)}
+    </div>
+  `;
+
+  container.prepend(item);
+}
+
+
+function escapeHtml(value) {
+
+  return String(value)
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#039;");
+}
+
+
+/*
+ * ============================================================
+ * WebSocket
+ * ============================================================
+ */
+
+function connectWebSocket() {
+
+  if (ws &&
+      (ws.readyState === WebSocket.OPEN ||
+       ws.readyState === WebSocket.CONNECTING)) {
+    return;
+  }
+
+  setConnection(false);
+
+  const url =
+    CONFIG.websocket +
+    "?token=" +
+    encodeURIComponent(CONFIG.deviceToken);
+
+  console.log("Connecting:", url);
+
+  try {
+
+    ws = new WebSocket(url);
+
+  } catch (error) {
+
+    console.error(error);
+
+    scheduleReconnect();
+
+    return;
+  }
+
+
+  ws.onopen = function() {
+
+    console.log("IoTCloud WebSocket connected");
+
+    setConnection(true);
+
+    addActivity("CONNECTED", {
+      websocket: "connected"
+    });
+  };
+
+
+  ws.onmessage = function(event) {
+
+    received++;
+
+    document.getElementById("receivedCount").textContent =
+      received;
+
+    console.log("IoTCloud message:", event.data);
+
+    let message;
+
+    try {
+      message = JSON.parse(event.data);
+    } catch {
+      message = event.data;
+    }
+
+    processRealtimeMessage(message);
+
+    addActivity("RECEIVED", message);
+  };
+
+
+  ws.onerror = function(error) {
+
+    console.error("WebSocket error:", error);
+
+    addActivity("ERROR", "WebSocket error");
+  };
+
+
+  ws.onclose = function() {
+
+    console.log("WebSocket disconnected");
+
+    setConnection(false);
+
+    addActivity("DISCONNECTED", {
+      websocket: "closed"
+    });
+
+    scheduleReconnect();
+  };
+}
+
+
+function scheduleReconnect() {
+
+  clearTimeout(reconnectTimer);
+
+  reconnectTimer = setTimeout(
+    connectWebSocket,
+    3000
+  );
+}
+
+
+/*
+ * ============================================================
+ * Incoming realtime data
+ * ============================================================
+ */
+
+function processRealtimeMessage(message) {
+
+  /*
+   * IoTCloud may wrap the published data inside
+   * different fields depending on the server response.
+   *
+   * We therefore inspect common shapes.
+   */
+
+  let data = message;
+
+  if (message && message.data !== undefined) {
+    data = message.data;
+  }
+
+  if (message && message.payload !== undefined) {
+    data = message.payload;
+  }
+
+
+  /*
+   * Show complete message.
+   */
+
+  document.getElementById("dataBox").textContent =
+    typeof message === "string"
+      ? message
+      : JSON.stringify(message, null, 2);
+
+
+  /*
+   * Look for temperature.
+   */
+
+  if (data && typeof data === "object") {
+
+    if (data.temperature !== undefined) {
+
+      document.getElementById("temperature").textContent =
+        data.temperature + " °C";
+    }
+
+    if (data.temp !== undefined) {
+
+      document.getElementById("temperature").textContent =
+        data.temp + " °C";
+    }
+  }
+}
+
+
+/*
+ * ============================================================
+ * Publish through IoTCloud REST API
+ * ============================================================
+ */
+
+async function publishData() {
+
+  const topic =
+    document.getElementById("topicInput").value.trim();
+
+  const jsonText =
+    document.getElementById("jsonInput").value.trim();
+
+  const status =
+    document.getElementById("publishStatus");
+
+
+  if (!topic) {
+
+    status.textContent =
+      "Enter a topic.";
+
+    return;
+  }
+
+
+  let data;
+
+  try {
+
+    data = JSON.parse(jsonText);
+
+  } catch (error) {
+
+    status.textContent =
+      "Invalid JSON.";
+
+    return;
+  }
+
+
+  status.textContent =
+    "Publishing...";
+
+
+  try {
+
+    const response = await fetch(
+      CONFIG.publish,
+      {
+        method: "POST",
+
+        headers: {
+          "Authorization":
+            "Bearer " + CONFIG.deviceToken,
+
+          "Content-Type":
+            "application/json"
+        },
+
+        body: JSON.stringify({
+
+          deviceId:
+            CONFIG.deviceId,
+
+          topic:
+            topic,
+
+          data:
+            data
+        })
+      }
+    );
+
+
+    const text =
+      await response.text();
+
+
+    if (!response.ok) {
+
+      throw new Error(
+        "HTTP " +
+        response.status +
+        ": " +
+        text
+      );
+    }
+
+
+    sent++;
+
+    document.getElementById("sentCount").textContent =
+      sent;
+
+    status.textContent =
+      "Published successfully.";
+
+    addActivity("PUBLISHED", {
+      topic: topic,
+      data: data
+    });
+
+
+    /*
+     * IMPORTANT:
+     *
+     * We do NOT directly update the live-data display here.
+     *
+     * The display is updated when IoTCloud broadcasts the
+     * message through WebSocket.
+     *
+     * Therefore:
+     *
+     * Tab A publishes
+     *       ↓
+     * IoTCloud
+     *       ↓
+     * Tab A + Tab B + Tab C
+     *
+     * all receive the same data.
+     */
+
+  } catch (error) {
+
+    console.error(error);
+
+    status.textContent =
+      "Publish failed: " + error.message;
+
+    addActivity(
+      "PUBLISH ERROR",
+      error.message
+    );
+  }
+}
+
+
+/*
+ * ============================================================
+ * Example publisher
+ * ============================================================
+ */
+
+function sendExample() {
+
+  const data = {
+
+    temperature:
+      Number(
+        (20 + Math.random() * 15)
+          .toFixed(1)
+      ),
+
+    humidity:
+      Number(
+        (40 + Math.random() * 30)
+          .toFixed(1)
+      ),
+
+    voltage:
+      Number(
+        (3.2 + Math.random() * .4)
+          .toFixed(2)
+      ),
+
+    source:
+      "dashboard",
+
+    timestamp:
+      new Date().toISOString()
+  };
+
+
+  document.getElementById("topicInput").value =
+    "telemetry";
+
+  document.getElementById("jsonInput").value =
+    JSON.stringify(data, null, 2);
+
+
+  publishData();
+}
+
+
+/*
+ * ============================================================
+ * Activity controls
+ * ============================================================
+ */
+
+function clearActivity() {
+
+  document.getElementById("activity").innerHTML = "";
+
+  events = 0;
+
+  document.getElementById("eventCount").textContent =
+    "0 events";
+}
+
+
+/*
+ * ============================================================
+ * Startup
+ * ============================================================
+ */
+
+document.getElementById("topicInput").value =
+  CONFIG.defaultTopic;
+
+
+/*
+ * Connect automatically.
+ */
+
+connectWebSocket();
+
+
+/*
+ * ============================================================
+ * Keep browser tab alive / reconnect if necessary
+ * ============================================================
+ */
+
+window.addEventListener(
+  "online",
+  connectWebSocket
+);
+
+document.addEventListener(
+  "visibilitychange",
+  function() {
+
+    if (!document.hidden) {
+
+      if (!ws ||
+          ws.readyState !== WebSocket.OPEN) {
+
+        connectWebSocket();
+      }
+    }
+  }
+);
+
+</script>
+
+</body>
+</html>

@@ -14,5 +14,5 @@ COPY package.json ./
 COPY apps/api/package.json apps/api/package.json
 RUN npm install --workspace apps/api --omit=dev --include-workspace-root
 COPY --from=build /app/apps/api/dist apps/api/dist
-EXPOSE 10000
+ENV NODE_ENV=production
 CMD ["node", "apps/api/dist/server.js"]
