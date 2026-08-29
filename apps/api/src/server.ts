@@ -32,7 +32,29 @@ async function runWorkflows(event:Event){const {rows}=await pool.query('SELECT i
 function render(s:string,e:Event){return s.replace(/\\{\\{\\s*([^}]+)\\s*\\}\\}/g,(_,p)=>String(p.split('.').reduce((v:string|object,k:string)=>v&&typeof v==='object'?(v as any)[k]:undefined,e as any)??''))}
 async function credential(projectId:string,id:string|undefined,kind:string){if(!id)return null;const {rows}=await pool.query('SELECT secret FROM credentials WHERE id=$1 AND project_id=$2 AND kind=$3',[id,projectId,kind]);if(!rows[0])return null;return JSON.parse(decrypt(rows[0].secret))}
 
-broker.authenticate=async(client,username,password,cb)=>{try{const t=Buffer.isBuffer(username)?username.toString():String(username||'');const d=await deviceByToken(t);if(!d)return cb(null,false);(client as any).userdata=d;cb(null,true)}catch(e){cb(e as Error,false)}};
+broker.authenticate = async (client, username, password, cb) => {
+  try {
+    const t = Buffer.isBuffer(username)
+      ? username.toString()
+      : String(username || '');
+
+    const d = await deviceByToken(t);
+
+    if (!d) {
+      return cb(null, false);
+    }
+
+    (client as any).userdata = d;
+    cb(null, true);
+  } catch (e) {
+    const err = new Error('authentication failed') as Error & {
+      returnCode: number;
+    };
+
+    err.returnCode = 4;
+    cb(err, false);
+  }
+};
 broker.authorizePublish=async(client,packet,cb)=>{const d=(client as any).userdata;if(!d||!allowedTopic(packet.topic,d.project_id,d.id))return cb(new Error('publish not authorized'));cb(null)};
 broker.authorizeSubscribe=async(client,sub,cb)=>{const d=(client as any).userdata;const p=parseTopic(sub.topic);if(!d||!p||p.projectId!==d.project_id||p.deviceId!==d.id)return cb(new Error('subscribe not authorized'));cb(null,sub)};
 broker.on('clientReady',async c=>{const d=(c as any).userdata;if(d){await pool.query('UPDATE devices SET online=true,last_seen=now() WHERE id=$1',[d.id]);emit(d.project_id,{id:crypto.randomUUID(),type:'device.online',deviceId:d.id,projectId:d.project_id,data:{},timestamp:new Date().toISOString()})}});
