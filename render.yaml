@@ -3,7 +3,6 @@ services:
     name: iotcloud-api
     runtime: docker
     plan: free
-
     dockerfilePath: ./apps/api/Dockerfile
     healthCheckPath: /health
     envVars:
@@ -11,15 +10,34 @@ services:
         fromDatabase:
           name: iotcloud-db
           property: connectionString
+      - key: DATABASE_SSL
+        value: "true"
       - key: JWT_SECRET
         generateValue: true
       - key: CREDENTIAL_ENCRYPTION_KEY
         generateValue: true
+      - key: ALLOWED_ORIGIN
+        fromService:
+          name: iotcloud-web
+          type: web
+          envVarKey: RENDER_EXTERNAL_URL
+
   - type: web
     name: iotcloud-web
     runtime: static
     buildCommand: npm install && npm run build --workspace apps/web
     staticPublishPath: apps/web/dist
+    routes:
+      - type: rewrite
+        source: /*
+        destination: /index.html
+    envVars:
+      - key: VITE_API_URL
+        fromService:
+          name: iotcloud-api
+          type: web
+          envVarKey: RENDER_EXTERNAL_URL
+
 databases:
   - name: iotcloud-db
     plan: free

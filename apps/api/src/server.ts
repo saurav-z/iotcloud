@@ -16,7 +16,7 @@ import {allowedTopic,deviceTopic,parseTopic} from './topics.js';
 import {executeWorkflow,Event,Definition} from './workflow.js';
 
 const app=Fastify({logger:true,bodyLimit:1024*1024});
-await app.register(cors,{origin:true}); await app.register(jwt,{secret:process.env.JWT_SECRET||'dev-only-change-this'}); await app.register(websocket,{options:{maxPayload:1024*1024,perMessageDeflate:true}});
+await app.register(cors,{origin:process.env.ALLOWED_ORIGIN||true}); await app.register(jwt,{secret:process.env.JWT_SECRET||'dev-only-change-this'}); await app.register(websocket,{options:{maxPayload:1024*1024,perMessageDeflate:true}});
 const broker=await Aedes.createBroker({concurrency:100,drainTimeout:5000});
 const bus=new EventEmitter(); const wsClients=new Map<string,Set<any>>(); const sseClients=new Map<string,Set<any>>();
 const rate=new Map<string,{n:number,t:number}>();
