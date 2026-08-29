@@ -1,29 +1,51 @@
 services:
+  # ============================================================
+  # API
+  # ============================================================
   - type: web
     name: iotcloud-api
     runtime: docker
     plan: free
     dockerfilePath: ./Dockerfile
+
     envVars:
       - key: DATABASE_URL
         fromDatabase:
           name: iotcloud-db
           property: connectionString
+
       - key: DATABASE_SSL
         value: "true"
-      - key: ALLOWED_ORIGIN
-        value: "*"
 
+      - key: ALLOWED_ORIGIN
+        fromService:
+          type: web
+          name: iotcloud-web
+          property: host
+
+      - key: JWT_SECRET
+        generateValue: true
+
+      - key: PORT
+        value: "10000"
+
+  # ============================================================
+  # FRONTEND
+  # ============================================================
   - type: web
     name: iotcloud-web
     runtime: static
     rootDir: apps/web
     buildCommand: npm install && npm run build
     staticPublishPath: ./dist
+
     envVars:
       - key: VITE_API_URL
         value: "https://iotcloud-api-vgv8.onrender.com"
 
+# ==============================================================
+# DATABASE
+# ==============================================================
 databases:
   - name: iotcloud-db
     plan: free
