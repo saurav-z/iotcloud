@@ -1,0 +1,29 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: iotcloud
+      POSTGRES_PASSWORD: iotcloud
+      POSTGRES_DB: iotcloud
+    ports: ["5432:5432"]
+    volumes: [pgdata:/var/lib/postgresql/data]
+  api:
+    build:
+      context: .
+      dockerfile: apps/api/Dockerfile
+    environment:
+      DATABASE_URL: postgres://iotcloud:iotcloud@postgres:5432/iotcloud
+      JWT_SECRET: local-development-secret-change-me
+      CREDENTIAL_ENCRYPTION_KEY: 0123456789abcdef0123456789abcdef
+      PORT: 10000
+      MQTT_TCP_PORT: 1883
+    depends_on: [postgres]
+    ports: ["10000:10000","1883:1883"]
+  web:
+    image: node:22-alpine
+    working_dir: /app
+    volumes: [./apps/web:/app]
+    command: sh -c "npm install && npm run dev"
+    ports: ["5173:5173"]
+volumes:
+  pgdata:
