@@ -1336,10 +1336,13 @@ app.post(
   ) => {
     const body =
       z.object({
-        deviceId:
-          z.string().uuid(),
-        topic:
-          z.string().min(1),
+        deviceId: z
+          .string()
+          .uuid()
+          .optional(),
+        topic: z
+          .string()
+          .min(1),
         data: z.any(),
       }).parse(req.body);
 
@@ -1354,7 +1357,8 @@ app.post(
 
     if (
       !device ||
-      device.id !== body.deviceId
+      (body.deviceId &&
+        device.id !== body.deviceId)
     ) {
       return reply
         .code(403)
