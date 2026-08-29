@@ -120,3 +120,7 @@ npm run build
 ```
 
 The API tests cover credential encryption, topic isolation and workflow branching. The web build is included as the frontend smoke test.
+
+
+## Render / CORS
+The frontend always normalizes the API endpoint to HTTPS and WebSockets to WSS. The API enables public cross-origin requests for token-based clients. If a browser still reports CORS, check that `VITE_API_URL` and any saved `iotcloud_api_url` value are HTTPS (never HTTP).
