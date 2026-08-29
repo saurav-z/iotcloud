@@ -1,6 +1,5 @@
 import Fastify from 'fastify';
 import jwt from '@fastify/jwt';
-import cors from '@fastify/cors';
 import websocket from '@fastify/websocket';
 import bcrypt from 'bcryptjs';
 import { Aedes } from 'aedes';
@@ -70,10 +69,23 @@ app.addHook('onRequest', async (req, reply) => {
     return;
   }
 
-  if (isAuthRoute(req.url) && origin !== FRONTEND_ORIGIN) {
+  const isAuth = isAuthRoute(req.url);
+  const allowOrigin = isAuth ? FRONTEND_ORIGIN : origin;
+
+  reply.header('Access-Control-Allow-Origin', allowOrigin);
+  reply.header('Access-Control-Allow-Methods', 'GET,POST,PUT,PATCH,DELETE,OPTIONS');
+  reply.header('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Webhook-Secret');
+  reply.header('Access-Control-Max-Age', '86400');
+  reply.header('Vary', 'Origin');
+
+  if (isAuth && origin !== FRONTEND_ORIGIN) {
     return reply.code(403).send({
       error: 'origin not allowed',
     });
+  }
+
+  if (req.method === 'OPTIONS') {
+    return reply.code(204).send();
   }
 });
 
@@ -86,13 +98,6 @@ await app.register(websocket, {
     maxPayload: 1024 * 1024,
     perMessageDeflate: true,
   },
-});
-
-await app.register(cors, {
-  origin: true,
-  methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization', 'X-Webhook-Secret'],
-  maxAge: 86400,
 });
 
 /*
