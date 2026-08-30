@@ -787,6 +787,31 @@ function Credentials({project}:{project:any}){
     }
   }
 
+  async function connectTelegramWebhook(credId: string) {
+    try {
+      const res = await api(`/api/projects/${project.id}/credentials/${credId}/telegram/set-webhook`, {
+        method: 'POST',
+        body: JSON.stringify({ webhookUrl: `${apiBase()}/v1/telegram/webhook/${credId}` })
+      });
+      alert('⚡ ' + (res.message || 'Telegram Webhook Connected Successfully!'));
+    } catch (e: any) {
+      alert('Webhook setup failed: ' + e.message);
+    }
+  }
+
+  async function testCredential(cred: any) {
+    setTestingId(cred.id);
+    setTestResults(prev => ({ ...prev, [cred.id]: 'testing' }));
+    try {
+      await api(`/api/projects/${project.id}/credentials/${cred.id}/test`, { method: 'POST', body: '{}' });
+      setTestResults(prev => ({ ...prev, [cred.id]: 'success' }));
+    } catch (e: any) {
+      setTestResults(prev => ({ ...prev, [cred.id]: 'failed: ' + e.message }));
+    } finally {
+      setTestingId(null);
+    }
+  }
+
   const kinds = [
     { id: 'discord', label: 'Discord', icon: '💬', desc: 'Send rich message webhooks to your discord channels.' },
     { id: 'telegram', label: 'Telegram', icon: '✈', desc: 'Interact with the official Telegram Bot API.' },
@@ -937,16 +962,22 @@ function Credentials({project}:{project:any}){
                     />
                   </label>
                   <label style={{ marginTop: '12px' }}>
-                    Target Chat ID / Channel ID
+                    Target Chat ID / Channel ID (Optional Default)
                     <input
                       value={telegramChatId}
                       onChange={e => setTelegramChatId(e.target.value)}
                       placeholder="e.g. 123456789 or @mychannel"
                     />
-                    <small style={{ display: 'block', color: 'var(--muted)', marginTop: '4px', fontSize: '11px', textTransform: 'none', fontWeight: 500 }}>
-                      💡 <b>Tip:</b> Users can send <code>/start</code> to your Telegram Bot, then click <b>Sync Bot</b> below to auto-collect subscriber Chat IDs!
-                    </small>
                   </label>
+                  <div style={{ background: 'var(--panel)', border: '1px solid var(--border)', borderRadius: '8px', padding: '12px', marginTop: '12px' }}>
+                    <b style={{ fontSize: '12px', color: 'var(--text)', display: 'block', marginBottom: '6px' }}>📖 Two-Way Telegram Integration Guide</b>
+                    <ol style={{ fontSize: '11px', color: 'var(--muted)', margin: '0 0 0 16px', padding: 0, lineHeight: '1.6' }}>
+                      <li>Search <b>@BotFather</b> in Telegram, send <code>/newbot</code>, and copy your <b>Bot Token</b>.</li>
+                      <li>Paste the token above and click <b>Create Connector</b>.</li>
+                      <li><b>App ➔ Telegram (Outbound Alerts)</b>: Workflows automatically dispatch alerts to registered users or broadcast channels.</li>
+                      <li><b>Telegram ➔ App (Inbound Commands)</b>: Users chat with your bot (send <code>/start</code>). Click <b>Connect Webhook ⚡</b> on your card to stream Telegram commands directly into IoTCloud Workflows!</li>
+                    </ol>
+                  </div>
                 </>
               )}
 
@@ -1060,14 +1091,24 @@ function Credentials({project}:{project:any}){
                     >
                       👥 {subs.length} Subscribers {isExpanded ? '▲' : '▼'}
                     </button>
-                    <button
-                      className="primary"
-                      style={{ fontSize: '11px', padding: '3px 8px', marginTop: 0 }}
-                      disabled={syncingId === x.id}
-                      onClick={() => syncTelegramSubscribers(x.id)}
-                    >
-                      {syncingId === x.id ? 'Syncing...' : '🔄 Sync Bot'}
-                    </button>
+                    <div style={{ display: 'flex', gap: '4px' }}>
+                      <button
+                        className="outlineBtn"
+                        style={{ fontSize: '11px', padding: '3px 8px', marginTop: 0 }}
+                        onClick={() => connectTelegramWebhook(x.id)}
+                        title="Connect two-way Telegram Webhook"
+                      >
+                        ⚡ Webhook
+                      </button>
+                      <button
+                        className="primary"
+                        style={{ fontSize: '11px', padding: '3px 8px', marginTop: 0 }}
+                        disabled={syncingId === x.id}
+                        onClick={() => syncTelegramSubscribers(x.id)}
+                      >
+                        {syncingId === x.id ? 'Syncing...' : '🔄 Sync Bot'}
+                      </button>
+                    </div>
                   </div>
 
                   {isExpanded && (

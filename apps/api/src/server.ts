@@ -2042,6 +2042,24 @@ app.post(
 
 // --- TELEGRAM SUBSCRIBERS SYNC & MANAGEMENT ---
 
+function parseSecret(rawSecret: string): any {
+  if (!rawSecret) return {};
+  try {
+    const decrypted = decrypt(rawSecret);
+    return JSON.parse(decrypted);
+  } catch {
+    try {
+      return JSON.parse(rawSecret);
+    } catch {
+      return {};
+    }
+  }
+}
+
+function formatSecret(config: any): string {
+  return encrypt(JSON.stringify(config));
+}
+
 app.post(
   '/api/projects/:id/credentials/:credentialId/telegram/sync',
   {
@@ -2065,7 +2083,7 @@ app.post(
       return reply.code(404).send({ error: 'Telegram credential not found' });
     }
 
-    const config = JSON.parse(rows[0].secret);
+    const config = parseSecret(rows[0].secret);
     if (!config.token) {
       return reply.code(400).send({ error: 'Bot Token missing' });
     }
@@ -2117,7 +2135,7 @@ app.post(
         SET secret = $1
         WHERE id = $2
       `,
-      [JSON.stringify(config), req.params.credentialId],
+      [formatSecret(config), req.params.credentialId],
     );
 
     return {
@@ -2157,7 +2175,7 @@ app.post(
       return reply.code(404).send({ error: 'Telegram credential not found' });
     }
 
-    const config = JSON.parse(rows[0].secret);
+    const config = parseSecret(rows[0].secret);
     const existing: any[] = config.subscribers || [];
     const subMap = new Map<string, any>(existing.map(s => [String(s.chatId), s]));
 
@@ -2176,7 +2194,7 @@ app.post(
         SET secret = $1
         WHERE id = $2
       `,
-      [JSON.stringify(config), req.params.credentialId],
+      [formatSecret(config), req.params.credentialId],
     );
 
     return { ok: true, subscribers: config.subscribers };
@@ -2206,7 +2224,7 @@ app.delete(
       return reply.code(404).send({ error: 'Telegram credential not found' });
     }
 
-    const config = JSON.parse(rows[0].secret);
+    const config = parseSecret(rows[0].secret);
     const existing: any[] = config.subscribers || [];
     config.subscribers = existing.filter(s => String(s.chatId) !== String(req.params.targetChatId));
 
@@ -2216,14 +2234,66 @@ app.delete(
         SET secret = $1
         WHERE id = $2
       `,
-      [JSON.stringify(config), req.params.credentialId],
+      [formatSecret(config), req.params.credentialId],
     );
 
     return { ok: true, subscribers: config.subscribers };
   },
 );
 
-// Public Webhook for Telegram Bot Auto-Subscription
+// Programmatically set Telegram Webhook URL
+app.post(
+  '/api/projects/:id/credentials/:credentialId/telegram/set-webhook',
+  {
+    preHandler: (app as any).auth,
+  },
+  async (req: any, reply) => {
+    if (!(await projectOwned(req.params.id, req.user.sub))) {
+      return reply.code(404).send({ error: 'project not found' });
+    }
+
+    const { webhookUrl } = req.body || {};
+    const { rows } = await pool.query(
+      `
+        SELECT secret
+        FROM credentials
+        WHERE id = $1 AND project_id = $2 AND kind = 'telegram'
+      `,
+      [req.params.credentialId, req.params.id],
+    );
+
+    if (!rows[0]) {
+      return reply.code(404).send({ error: 'Telegram credential not found' });
+    }
+
+    const config = parseSecret(rows[0].secret);
+    if (!config.token) {
+      return reply.code(400).send({ error: 'Bot Token missing' });
+    }
+
+    const targetUrl = webhookUrl || `${process.env.PUBLIC_API_URL || 'http://localhost:3000'}/v1/telegram/webhook/${req.params.credentialId}`;
+    const res = await fetch(`https://api.telegram.org/bot${config.token}/setWebhook?url=${encodeURIComponent(targetUrl)}`);
+    const data = await res.json().catch(() => ({ description: 'Failed to set Telegram webhook' }));
+
+    if (!res.ok || !data.ok) {
+      return reply.code(400).send({ error: data.description || 'Failed to connect Telegram Webhook' });
+    }
+
+    config.webhookUrl = targetUrl;
+    await pool.query(
+      `
+        UPDATE credentials
+        SET secret = $1
+        WHERE id = $2
+      `,
+      [formatSecret(config), req.params.credentialId],
+    );
+
+    return { ok: true, webhookUrl: targetUrl, message: 'Telegram Webhook connected successfully!' };
+  },
+);
+
+// Public Webhook for Telegram Bot (Two-Way Telegram -> IoTCloud)
 app.post(
   '/v1/telegram/webhook/:credentialId',
   async (req: any, reply) => {
@@ -2232,7 +2302,7 @@ app.post(
 
     const { rows } = await pool.query(
       `
-        SELECT secret
+        SELECT project_id, secret
         FROM credentials
         WHERE id = $1 AND kind = 'telegram'
       `,
@@ -2243,7 +2313,8 @@ app.post(
       return reply.code(404).send({ error: 'Credential not found' });
     }
 
-    const config = JSON.parse(rows[0].secret);
+    const projectId = rows[0].project_id;
+    const config = parseSecret(rows[0].secret);
     const msg = body.message || body.channel_post || body.edited_message;
 
     if (msg && msg.chat) {
@@ -2251,6 +2322,7 @@ app.post(
       const username = msg.chat.username || msg.from?.username || '';
       const firstName = msg.chat.first_name || msg.from?.first_name || '';
       const lastName = msg.chat.last_name || msg.from?.last_name || '';
+      const text = msg.text || '';
 
       const existing: any[] = config.subscribers || [];
       const subMap = new Map<string, any>(existing.map(s => [String(s.chatId), s]));
@@ -2271,19 +2343,43 @@ app.post(
           SET secret = $1
           WHERE id = $2
         `,
-        [JSON.stringify(config), credentialId],
+        [formatSecret(config), credentialId],
       );
 
-      // Auto-reply to user on Telegram
-      if (config.token) {
-        await fetch(`https://api.telegram.org/bot${config.token}/sendMessage`, {
-          method: 'POST',
-          headers: { 'content-type': 'application/json' },
-          body: JSON.stringify({
-            chat_id: chatId,
-            text: `👋 Hello ${firstName || 'there'}! You are now subscribed to IoTCloud notification alerts. ⚡`,
-          }),
-        }).catch(() => {});
+      // Trigger IoTCloud Workflow Engine for Two-Way Automation
+      const telegramEvent: Event = {
+        id: crypto.randomUUID(),
+        projectId,
+        deviceId: `telegram:${chatId}`,
+        topic: 'telegram/message',
+        type: 'telegram.message',
+        data: {
+          text,
+          chatId,
+          username,
+          firstName,
+          lastName,
+          command: text.startsWith('/') ? text.split(' ')[0] : null,
+        },
+        timestamp: new Date().toISOString(),
+      };
+
+      // Emit event to workflow engine
+      runWorkflows(telegramEvent).catch(e => console.error('[Telegram Workflow Error]', e));
+
+      // Auto-reply to user if sending /start or /help
+      if (text.startsWith('/start')) {
+        if (config.token) {
+          await fetch(`https://api.telegram.org/bot${config.token}/sendMessage`, {
+            method: 'POST',
+            headers: { 'content-type': 'application/json' },
+            body: JSON.stringify({
+              chat_id: chatId,
+              text: `👋 Hello ${firstName || 'there'}! You are now connected to IoTCloud.\n\n⚡ Your Chat ID: <code>${chatId}</code>\nYou will receive automated alerts and can trigger workflows directly from this chat!`,
+              parse_mode: 'HTML',
+            }),
+          }).catch(() => {});
+        }
       }
     }
 
