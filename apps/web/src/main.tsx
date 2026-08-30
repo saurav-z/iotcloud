@@ -25,7 +25,25 @@ async function api(path:string,opts:RequestInit={}){
   return data;
 }
 
-const palette=[['mqtt.trigger','MQTT Trigger'],['webhook.trigger','Webhook Trigger'],['logic.if','IF / Condition'],['logic.filter','Filter'],['action.telegram.send','Telegram'],['action.discord.send','Discord'],['action.email.send','Email'],['action.webhook.send','HTTP Webhook'],['iot.mqtt.publish','MQTT Publish'],['event.trigger','Event Trigger']];
+const NODE_CATEGORIES = [
+  { title: 'Input', desc: 'Where events come from', items: [
+    { type: 'event.trigger', label: '◎ Event Input', desc: 'Listens for any device event' },
+    { type: 'webhook.trigger', label: '🔗 Webhook Input', desc: 'Receives external HTTP calls' },
+  ]},
+  { title: 'Condition', desc: 'Filter & route events', items: [
+    { type: 'logic.if', label: '⑂ IF Condition', desc: 'Branch based on data field' },
+    { type: 'logic.filter', label: '⊘ Filter', desc: 'Pass or block events' },
+  ]},
+  { title: 'Action', desc: 'React to events', items: [
+    { type: 'action.telegram.send', label: '✈ Telegram', desc: 'Send bot message' },
+    { type: 'action.discord.send', label: '💬 Discord', desc: 'Post to channel' },
+    { type: 'action.email.send', label: '✉ Email', desc: 'Send via SMTP' },
+    { type: 'action.webhook.send', label: '↗ HTTP Request', desc: 'Call external API' },
+    { type: 'iot.mqtt.publish', label: '⬡ MQTT Publish', desc: 'Publish to broker topic' },
+  ]},
+];
+const OPERATORS = ['>','>=','<','<=','==','!=','contains','exists'];
+const EVENT_TYPES = ['mqtt.message','device.online','device.offline','webhook','schedule'];
 
 function App(){
   const[token,setToken]=useState(localStorage.getItem('iot_token'));
@@ -132,7 +150,7 @@ function App(){
         page==='events'?<Events project={project} devices={devices} events={events} setEvents={setEvents} onRefresh={async()=>{const ds=await api(`/api/projects/${project.id}/devices`);setDevices(ds);setProject({...project,__deviceToken:ds[0]?.token||''})}}/>:
         page==='dashboard'?<Dashboard events={events} connected={connected} devices={devices}/>:
         page==='devices'?<Devices project={project} devices={devices} setDevices={setDevices} setProject={setProject}/>:
-        page==='workflows'?<Workflows project={project}/>:
+        page==='workflows'?<Workflows project={project} devices={devices}/>:
         page==='developer'?<Developer project={project} devices={devices}/>:
         page==='settings'?<Settings apiUrl={apiUrl} setApiUrl={(v)=>{const n=normalizeApi(v);localStorage.setItem('iotcloud_api_url',n);setApiUrl(n);location.reload()}}/>:
         <Credentials project={project}/>
@@ -206,9 +224,255 @@ function Devices({project,devices,setDevices,setProject}:{project:any;devices:an
  const[name,setName]=useState('');async function add(){if(!name)return;const d=await api(`/api/projects/${project.id}/devices`,{method:'POST',body:JSON.stringify({name})});setDevices([d,...devices]);setName('');setProject({...project,__deviceToken:d.token})}
  return <div><div className="pageIntro"><div><h2>Devices</h2><p>Credentials, presence and endpoints for every device.</p></div><div className="addRow"><input value={name} onChange={e=>setName(e.target.value)} placeholder="New device name"/><button className="primary" onClick={add}>Add device</button></div></div><div className="deviceGrid">{devices.map(d=><div className="deviceCard" key={d.id}><div className="deviceHead"><div className={`deviceDot ${d.online?'on':''}`}/><div><b>{d.name}</b><small>{d.online?'Online':'Offline'} · {d.id.slice(0,8)}</small></div></div><div className="tokenBox"><span>DEVICE TOKEN</span><code>{d.token}</code></div><button className="outlineBtn" onClick={()=>navigator.clipboard?.writeText(d.token)}>Copy token</button></div>)}{!devices.length&&<EmptyState text="No devices yet."/ >}</div></div>
 }
-function Workflows({project}:{project:any}){const[flows,setFlows]=useState<any[]>([]);const[active,setActive]=useState<any>(null);useEffect(()=>{api(`/api/projects/${project.id}/workflows`).then(setFlows)},[project.id]);return <div className="workflowLayout"><div className="flowSide"><button className="primary wide" onClick={()=>setActive({id:null,name:'New workflow',definition:{nodes:[{id:'trigger',type:'mqtt.trigger',position:{x:80,y:120},data:{label:'MQTT Trigger',topic:'telemetry'}},{id:'if',type:'logic.if',position:{x:350,y:120},data:{label:'IF temperature > 30',field:'temperature',operator:'>',value:30}}],edges:[{id:'e1',source:'trigger',target:'if'}]}})}>＋ New workflow</button>{flows.map(f=><button className={`flowItem ${active?.id===f.id?'selected':''}`} onClick={()=>setActive(f)} key={f.id}><b>{f.name}</b><small>{f.enabled?'Enabled':'Draft'}</small></button>)}</div><div className="flowCanvas">{active?<WorkflowEditor project={project} workflow={active} onSaved={(f)=>{setFlows((v:any[])=>{const i=v.findIndex(x=>x.id===f.id);return i<0?[f,...v]:v.map(x=>x.id===f.id?f:x)});setActive(f)}}/>:<EmptyState text="Select a workflow or create one."/>}</div></div>}
-function WorkflowEditor({project,workflow,onSaved}:{project:any;workflow:any;onSaved:(f:any)=>void}){const initial=workflow.definition||{nodes:[],edges:[]};const[nodes,setNodes,onNodesChange]=useNodesState(initial.nodes);const[edges,setEdges,onEdgesChange]=useEdgesState(initial.edges);const[selected,setSelected]=useState<Node|null>(nodes[0]||null);const[name,setName]=useState(workflow.name||'New workflow');const add=(type:string)=>{const id=crypto.randomUUID();setNodes(v=>[...v,{id,type,position:{x:100+v.length*40,y:100+v.length*20},data:{label:palette.find(x=>x[0]===type)?.[1]||type}} as Node])};return <div className="editor"><div className="nodePalette"><b>Nodes</b>{palette.map(p=><button key={p[0]} onClick={()=>add(p[0])}>{p[1]}</button>)}</div><div className="rf"><ReactFlow nodes={nodes} edges={edges} onNodesChange={onNodesChange} onEdgesChange={onEdgesChange} onConnect={(c:Connection)=>setEdges(e=>addEdge(c,e))} onNodeClick={(_,n)=>setSelected(n)} fitView><Background/><Controls/><MiniMap/></ReactFlow></div><div className="inspector"><input value={name} onChange={e=>setName(e.target.value)} className="titleInput"/><b>Node configuration</b>{selected?<NodeForm node={selected} setNodes={setNodes}/>:<small>Select a node</small>}<button className="primary save" onClick={async()=>{const body={name,definition:{nodes,edges},enabled:true};const f=workflow.id?await api(`/api/projects/${project.id}/workflows/${workflow.id}`,{method:'PUT',body:JSON.stringify(body)}):await api(`/api/projects/${project.id}/workflows`,{method:'POST',body:JSON.stringify(body)});onSaved(f)}}>Save & enable</button></div></div>}
-function NodeForm({node,setNodes}:{node:Node;setNodes:any}){const d=(node.data||{}) as any;const update=(k:string,v:any)=>setNodes((ns:Node[])=>ns.map(n=>n.id===node.id?{...n,data:{...n.data,[k]:v,label:n.data?.label}}:n));return <div className="form">{['topic','field','operator','value','text','url','to'].map(k=><label key={k}>{k}<input value={d[k]??''} onChange={e=>update(k,e.target.value)}/></label>)}</div>}
+function Workflows({project,devices}:{project:any;devices:any[]}){
+  const[flows,setFlows]=useState<any[]>([]);
+  const[active,setActive]=useState<any>(null);
+  const[credentials,setCredentials]=useState<any[]>([]);
+  useEffect(()=>{
+    api(`/api/projects/${project.id}/workflows`).then(setFlows).catch(()=>{});
+    api(`/api/projects/${project.id}/credentials`).then(setCredentials).catch(()=>{});
+  },[project.id]);
+
+  function newWorkflow(){
+    setActive({
+      id:null,
+      name:'New workflow',
+      definition:{
+        nodes:[
+          {id:crypto.randomUUID(),type:'event.trigger',position:{x:80,y:140},data:{label:'Event Input',eventType:'mqtt.message',deviceId:'',topic:''}},
+          {id:crypto.randomUUID(),type:'logic.if',position:{x:380,y:140},data:{label:'IF Condition',field:'temperature',operator:'>',value:'30'}},
+        ],
+        edges:[]
+      }
+    });
+  }
+
+  return <div className="workflowLayout">
+    <div className="flowSide">
+      <button className="primary wide" onClick={newWorkflow}>＋ New workflow</button>
+      {flows.map(f=>
+        <button className={`flowItem ${active?.id===f.id?'selected':''}`} onClick={()=>setActive(f)} key={f.id}>
+          <b>{f.name}</b>
+          <small>{f.enabled?'Enabled':'Draft'}</small>
+        </button>
+      )}
+    </div>
+    <div className="flowCanvas">
+      {active
+        ? <WorkflowEditor
+            project={project}
+            workflow={active}
+            devices={devices}
+            credentials={credentials}
+            onSaved={(f)=>{
+              setFlows((v:any[])=>{
+                const i=v.findIndex(x=>x.id===f.id);
+                return i<0?[f,...v]:v.map(x=>x.id===f.id?f:x);
+              });
+              setActive(f);
+            }}
+          />
+        : <EmptyState text="Select a workflow or create one."/>
+      }
+    </div>
+  </div>
+}
+
+function WorkflowEditor({project,workflow,devices,credentials,onSaved}:{project:any;workflow:any;devices:any[];credentials:any[];onSaved:(f:any)=>void}){
+  const initial=workflow.definition||{nodes:[],edges:[]};
+  const[nodes,setNodes,onNodesChange]=useNodesState(initial.nodes);
+  const[edges,setEdges,onEdgesChange]=useEdgesState(initial.edges);
+  const[selected,setSelected]=useState<Node|null>(null);
+  const[name,setName]=useState(workflow.name||'New workflow');
+
+  const addNode=(type:string)=>{
+    const allItems=NODE_CATEGORIES.flatMap(c=>c.items);
+    const meta=allItems.find(x=>x.type===type);
+    const id=crypto.randomUUID();
+    const newNode:Node = {
+      id,
+      type,
+      position:{x:120+nodes.length*50,y:130+nodes.length*30},
+      data:{label:meta?.label||type}
+    };
+    setNodes(v=>[...v,newNode]);
+  };
+
+  async function save(){
+    const body={name,definition:{nodes,edges},enabled:true};
+    const f=workflow.id
+      ? await api(`/api/projects/${project.id}/workflows/${workflow.id}`,{method:'PUT',body:JSON.stringify(body)})
+      : await api(`/api/projects/${project.id}/workflows`,{method:'POST',body:JSON.stringify(body)});
+    onSaved(f);
+  }
+
+  return <div className="editor">
+    <div className="nodePalette">
+      {NODE_CATEGORIES.map(cat=>
+        <div key={cat.title} className="paletteGroup">
+          <div className="paletteCatTitle">{cat.title}</div>
+          <div className="paletteCatDesc">{cat.desc}</div>
+          {cat.items.map(item=>
+            <button key={item.type} onClick={()=>addNode(item.type)} title={item.desc}>
+              {item.label}
+            </button>
+          )}
+        </div>
+      )}
+    </div>
+    <div className="rf">
+      <ReactFlow
+        nodes={nodes}
+        edges={edges}
+        onNodesChange={onNodesChange}
+        onEdgesChange={onEdgesChange}
+        onConnect={(c:Connection)=>setEdges(e=>addEdge(c,e))}
+        onNodeClick={(_,n)=>setSelected(n)}
+        fitView
+      >
+        <Background/><Controls/><MiniMap/>
+      </ReactFlow>
+    </div>
+    <div className="inspector">
+      <input value={name} onChange={e=>setName(e.target.value)} className="titleInput" placeholder="Workflow name"/>
+      <b>Node Inspector</b>
+      {selected
+        ? <NodeForm node={selected} setNodes={setNodes} devices={devices} credentials={credentials}/>
+        : <div className="inspectorHint"><div className="emptyIcon">◌</div><span>Click a node on the canvas to configure it</span></div>
+      }
+      <button className="primary save" onClick={save}>Save & enable workflow</button>
+    </div>
+  </div>
+}
+
+function NodeForm({node,setNodes,devices,credentials}:{node:Node;setNodes:any;devices:any[];credentials:any[]}){
+  const d=(node.data||{}) as any;
+  const t=node.type||'';
+
+  const update=(k:string,v:any)=>setNodes((ns:Node[])=>
+    ns.map(n=>n.id===node.id?{...n,data:{...n.data,[k]:v,label:n.data?.label}}:n)
+  );
+
+  const allItems=NODE_CATEGORIES.flatMap(c=>c.items);
+  const meta=allItems.find(x=>x.type===t);
+
+  return <div className="form">
+    <div className="nodeTypeTag">{meta?.label||t}</div>
+    {meta?.desc && <p className="muted" style={{fontSize:'11px',margin:'0 0 14px'}}>{meta.desc}</p>}
+
+    {/* --- INPUT NODES --- */}
+    {(t==='event.trigger'||t==='mqtt.trigger') && <>
+      <label>Listen to device
+        <select value={d.deviceId||''} onChange={e=>update('deviceId',e.target.value)}>
+          <option value="">All devices</option>
+          {devices.map(dev=><option key={dev.id} value={dev.id}>{dev.name}</option>)}
+        </select>
+      </label>
+      <label>Event type
+        <select value={d.eventType||''} onChange={e=>update('eventType',e.target.value)}>
+          <option value="">Any event</option>
+          {EVENT_TYPES.map(et=><option key={et} value={et}>{et}</option>)}
+        </select>
+      </label>
+      <label>Topic filter
+        <input value={d.topic||''} onChange={e=>update('topic',e.target.value)} placeholder="telemetry (optional)"/>
+      </label>
+    </>}
+
+    {t==='webhook.trigger' && <>
+      <label>Webhook URL
+        <input readOnly value={`${apiBase()}/v1/webhooks/WORKFLOW_ID`} style={{opacity:0.7,fontSize:'11px'}}/>
+      </label>
+      <p className="muted" style={{fontSize:'11px',margin:'0'}}>This URL is auto-generated when you save the workflow. External services POST JSON here to trigger the flow.</p>
+    </>}
+
+    {/* --- CONDITION NODES --- */}
+    {t==='logic.if' && <>
+      <label>Data field
+        <input value={d.field||''} onChange={e=>update('field',e.target.value)} placeholder="e.g. temperature"/>
+      </label>
+      <label>Operator
+        <select value={d.operator||'>'} onChange={e=>update('operator',e.target.value)}>
+          {OPERATORS.map(op=><option key={op} value={op}>{op}</option>)}
+        </select>
+      </label>
+      <label>Value
+        <input value={d.value??''} onChange={e=>update('value',e.target.value)} placeholder="e.g. 30"/>
+      </label>
+      <p className="muted" style={{fontSize:'11px',margin:'4px 0 0'}}>True path → green handle · False path → red handle</p>
+    </>}
+
+    {t==='logic.filter' && <>
+      <p className="muted" style={{fontSize:'11px',margin:'0'}}>Passes events that have a non-empty <code>data</code> body. Empty or null payloads are blocked.</p>
+    </>}
+
+    {/* --- ACTION NODES --- */}
+    {t==='action.telegram.send' && <>
+      <label>Credential
+        <select value={d.credentialId||''} onChange={e=>update('credentialId',e.target.value)}>
+          <option value="">Select Telegram credential...</option>
+          {credentials.filter(c=>c.kind==='telegram').map(c=><option key={c.id} value={c.id}>{c.name}</option>)}
+        </select>
+      </label>
+      <label>Message template
+        <textarea value={d.text||''} onChange={e=>update('text',e.target.value)} placeholder="Alert: {{data.temperature}}°C from device {{deviceId}}" rows={3}/>
+      </label>
+    </>}
+
+    {t==='action.discord.send' && <>
+      <label>Credential
+        <select value={d.credentialId||''} onChange={e=>update('credentialId',e.target.value)}>
+          <option value="">Select Discord credential...</option>
+          {credentials.filter(c=>c.kind==='discord').map(c=><option key={c.id} value={c.id}>{c.name}</option>)}
+        </select>
+      </label>
+      <label>Message template
+        <textarea value={d.text||''} onChange={e=>update('text',e.target.value)} placeholder="🚨 Temperature {{data.temperature}}°C" rows={3}/>
+      </label>
+    </>}
+
+    {t==='action.email.send' && <>
+      <label>SMTP Credential
+        <select value={d.credentialId||''} onChange={e=>update('credentialId',e.target.value)}>
+          <option value="">Select SMTP credential...</option>
+          {credentials.filter(c=>c.kind==='smtp').map(c=><option key={c.id} value={c.id}>{c.name}</option>)}
+        </select>
+      </label>
+      <label>To address
+        <input value={d.to||''} onChange={e=>update('to',e.target.value)} placeholder="admin@example.com"/>
+      </label>
+      <label>Subject
+        <input value={d.subject||''} onChange={e=>update('subject',e.target.value)} placeholder="IoTCloud alert"/>
+      </label>
+      <label>Body template
+        <textarea value={d.text||''} onChange={e=>update('text',e.target.value)} placeholder="Device {{deviceId}} reported {{data.temperature}}°C" rows={3}/>
+      </label>
+    </>}
+
+    {t==='action.webhook.send' && <>
+      <label>Endpoint URL
+        <input value={d.url||''} onChange={e=>update('url',e.target.value)} placeholder="https://api.example.com/notify"/>
+      </label>
+      <label>HTTP Method
+        <select value={d.method||'POST'} onChange={e=>update('method',e.target.value)}>
+          <option>POST</option><option>PUT</option><option>PATCH</option>
+        </select>
+      </label>
+    </>}
+
+    {t==='iot.mqtt.publish' && <>
+      <label>Publish to device
+        <select value={d.deviceId||''} onChange={e=>update('deviceId',e.target.value)}>
+          <option value="">Gateway (default)</option>
+          {devices.map(dev=><option key={dev.id} value={dev.id}>{dev.name}</option>)}
+        </select>
+      </label>
+      <label>Topic
+        <input value={d.topic||''} onChange={e=>update('topic',e.target.value)} placeholder="commands"/>
+      </label>
+    </>}
+  </div>
+}
 function Developer({project, devices}:{project:any;devices:any[]}){const[docs,setDocs]=useState<any>();const[selectedDeviceId,setSelectedDeviceId]=useState<string>('');useEffect(()=>{api('/api/docs').then(setDocs).catch(()=>{})},[]);const base=apiBase();const baseHost=base.replace(/^https?:\/\//i,"").replace(/^\/\//,"");const wsUrl=`${base.replace(/^https?:\/\//i,'wss://')}/v1/ws?token=DEVICE_TOKEN`;const sseUrl=`${base}/v1/events?token=DEVICE_TOKEN`;const mqttUrl=`${base.replace(/^https?:\/\//i,'wss://')}/mqtt`;const selectedDevice=devices.find(d=>d.id===selectedDeviceId);const deviceId=selectedDevice?.id||'DEVICE_ID';const deviceToken=selectedDevice?.token||'DEVICE_TOKEN';const projectId=project?.id||'PROJECT_ID';const examples=useMemo(()=>{const curlPublish=`curl -X POST ${base}/api/device/publish \\\n  -H 'Authorization: Bearer ${deviceToken}' \\\n  -H 'content-type: application/json' \\\n  -d '{\n    "deviceId": "${deviceId}",\n    "topic": "telemetry",\n    "data": {"temperature": 28.4}\n  }'`;const curlResponse=`# Response 200\n{ "ok": true }\n\n# Response 403\n{ "error": "device token required" }`;const wsCode=`const ws = new WebSocket('${base.replace(/^https?:\/\//i,'wss://')}/v1/ws?token=${deviceToken}');\n\nws.onopen    = () => console.log('connected');\nws.onmessage = e => console.log(JSON.parse(e.data));\nws.onerror   = e => console.error(e);\nws.onclose   = e => console.log('closed', e.code);\n\n// Publish\nws.send(JSON.stringify({\n  action: 'publish',\n  topic: 'telemetry',\n  data: { temperature: 28.4 }\n}));`;const pythonCode=`import requests\n\n# Publish telemetry\nrequests.post(\n  '${base}/api/device/publish',\n  headers={'Authorization':'Bearer ${deviceToken}'},\n  json={\n    'deviceId':'${deviceId}',\n    'topic':'telemetry',\n    'data':{'temperature': 28.4}\n  }\n)\n\n# Response\n# { "ok": true }`;const mqttCode=`# MQTT over WebSocket\n# Broker: ${baseHost}\n# Port: 443 (WSS)\n# Topic: iotcloud/${projectId}/${deviceId}/telemetry\n\nimport paho.mqtt.client as mqtt\n\nclient = mqtt.Client(client_id='${deviceId}', transport='websockets')\nclient.connect('${baseHost}', 443, 60)\nclient.publish(\n  'iotcloud/${projectId}/${deviceId}/telemetry',\n  json.dumps({'temperature': 28.4})\n)`;const aiContext=`Project ID:   ${projectId}\nDevice ID:    ${deviceId}\nDevice Token: ${deviceToken}\n\nBase URL:     ${base}\nWebSocket:    ${base.replace(/^https?:\/\//i,'wss://')}/v1/ws?token=${deviceToken}\nSSE:          ${base}/v1/events?token=${deviceToken}\nMQTT/WS:      ${base.replace(/^https?:\/\//i,'wss://')}/mqtt\n\nTopic:        iotcloud/${projectId}/${deviceId}/telemetry\n\n# Interconnection\n# REST POST /api/device/publish  → broker.publish() → mqtt.message event\n# WebSocket /v1/ws publish action → broker.publish() → mqtt.message event\n# MQTT /mqtt publish            → broker.publish() → mqtt.message event\n# All paths converge at the broker and emit to WS + SSE clients.`;return{curlPublish,curlResponse,wsCode,pythonCode,mqttCode,aiContext};},[base,deviceId,deviceToken,projectId]);function CopyButton({text}:{text:string}){const[ok,setOk]=useState(false);return <button className="copyBtn" onClick={async()=>{try{await navigator.clipboard.writeText(text);setOk(true);setTimeout(()=>setOk(false),1200)}catch{}}}>{ok?'Copied':'Copy'}</button>}return <div className="docs"><div className="pageIntro"><div><h2>Developer Center</h2><p>Connect devices, publish telemetry, and inspect realtime endpoints.</p></div><div className="addRow"><select value={selectedDeviceId} onChange={e=>setSelectedDeviceId(e.target.value)}><option value="">Select device...</option>{devices.map(d=><option key={d.id} value={d.id}>{d.name} ({d.id.slice(0,8)})</option>)}</select></div></div><section className="panel"><div className="panelHead"><div><b>Realtime endpoints</b><span>Current API: {new URL(base).host}</span></div></div><div className="kv"><div className="item"><label>Base</label><span className="val">{base}</span></div><div className="item"><label>WebSocket</label><span className="val">{wsUrl.replace('DEVICE_TOKEN',selectedDevice?deviceToken:'DEVICE_TOKEN')}</span></div><div className="item"><label>SSE</label><span className="val">{sseUrl.replace('DEVICE_TOKEN',selectedDevice?deviceToken:'DEVICE_TOKEN')}</span></div><div className="item"><label>MQTT/WS</label><span className="val">{mqttUrl}</span></div><div className="item"><label>Topic</label><span className="val">iotcloud/{projectId}/{deviceId}/{"{topic}"}</span></div></div></section>{!selectedDevice?<section className="panel"><b>Getting started</b><p className="muted">Select a device above to see ready-made examples with your actual device ID and token. All protocols (REST, WebSocket, MQTT) publish through the same broker and reach every connected client in real time.</p><div className="grid3"><CodeBlock title="REST Publish" code={examples.curlPublish} copyText={examples.curlPublish}/><CodeBlock title="REST Response" code={examples.curlResponse} copyText={examples.curlResponse}/></div></section>:<><section className="panel"><b>Publish telemetry — {selectedDevice.name}</b><p className="muted">Use any of the methods below. All of them call the same broker, so events appear instantly in Live Events and on every connected dashboard.</p><div className="grid3"><CodeBlock title="cURL" code={examples.curlPublish} copyText={examples.curlPublish}/><CodeBlock title="Python" code={examples.pythonCode} copyText={examples.pythonCode}/><CodeBlock title="WebSocket" code={examples.wsCode} copyText={examples.wsCode}/></div></section><section className="panel"><b>MQTT over WebSocket</b><p className="muted">Connect your ESP32, Raspberry Pi, or any MQTT client using WebSocket transport on port 443.</p><CodeBlock title="MQTT (Python/paho)" code={examples.mqttCode} copyText={examples.mqttCode}/></section></>}<section className="panel"><b>Topic model</b><p><code>iotcloud/{projectId}/{deviceId}/{"{topic}"}</code></p><p className="muted">Device tokens authenticate MQTT and REST publishing. Browser clients use HTTPS and WSS automatically.</p></section><section className="panel"><div className="panelHead"><div><b>AI Context</b><span>Copy everything below to paste into an AI assistant</span></div><button className="outlineBtn" onClick={async()=>{try{await navigator.clipboard.writeText(examples.aiContext)}catch{}}}>Copy All</button></div><CodeBlock title="" code={examples.aiContext} copyText={examples.aiContext}/></section></div>}
 function Settings({apiUrl,setApiUrl}:{apiUrl:string;setApiUrl:(v:string)=>void}){const[value,setValue]=useState(apiUrl);const[test,setTest]=useState('');async function check(){try{const u=normalizeApi(value);const r=await fetch(u+'/health');setTest(r.ok?'Connection successful':'Server returned '+r.status)}catch(e:any){setTest('Connection failed: '+e.message)}}return <div className="settingsPage"><div className="pageIntro"><div><h2>Connection settings</h2><p>Change the API endpoint without rebuilding the frontend.</p></div></div><section className="panel settingsCard"><div className="settingIcon">↗</div><div className="settingBody"><label>API base URL<input value={value} onChange={e=>setValue(e.target.value)} placeholder="https://your-api.onrender.com"/></label><p className="muted">HTTP is automatically upgraded to HTTPS. WebSocket connections automatically use WSS.</p><div className="settingActions"><button className="primary" onClick={()=>setApiUrl(value)}>Save endpoint</button><button className="outlineBtn" onClick={()=>{setValue(DEFAULT_API);localStorage.removeItem('iotcloud_api_url')}}>Use default</button><button className="outlineBtn" onClick={check}>Test connection</button></div>{test&&<div className="sendStatus">{test}</div>}</div></section><section className="panel"><b>Why CORS can still appear</b><p className="muted">The browser must call the HTTPS API directly. An HTTP Render URL redirects to HTTPS, and browsers reject redirects during CORS preflight. This app normalizes the endpoint before every request.</p></section></div>}
 
