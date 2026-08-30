@@ -814,19 +814,6 @@ function Credentials({project}:{project:any}){
     }
   }
 
-  async function testCredential(cred: any) {
-    setTestingId(cred.id);
-    setTestResults(prev => ({ ...prev, [cred.id]: 'testing' }));
-    try {
-      await api(`/api/projects/${project.id}/credentials/${cred.id}/test`, { method: 'POST', body: '{}' });
-      setTestResults(prev => ({ ...prev, [cred.id]: 'success' }));
-    } catch (e: any) {
-      setTestResults(prev => ({ ...prev, [cred.id]: 'failed: ' + e.message }));
-    } finally {
-      setTestingId(null);
-    }
-  }
-
   const kinds = [
     { id: 'discord', label: 'Discord', icon: '💬', desc: 'Send rich message webhooks to your discord channels.' },
     { id: 'telegram', label: 'Telegram', icon: '✈', desc: 'Interact with the official Telegram Bot API.' },
@@ -956,14 +943,29 @@ function Credentials({project}:{project:any}){
 
             <div className="credentialFormFields">
               {kind === 'discord' && (
-                <label>
-                  Discord Webhook URL
-                  <input
-                    value={discordWebhookUrl}
-                    onChange={e => setDiscordWebhookUrl(e.target.value)}
-                    placeholder="https://discord.com/api/webhooks/..."
-                  />
-                </label>
+                <>
+                  <label>
+                    Discord Webhook URL
+                    <input
+                      value={discordWebhookUrl}
+                      onChange={e => setDiscordWebhookUrl(e.target.value)}
+                      placeholder="https://discord.com/api/webhooks/..."
+                    />
+                  </label>
+                  <div style={{ background: 'var(--panel)', border: '1px solid var(--border)', borderRadius: '8px', padding: '12px', marginTop: '12px' }}>
+                    <b style={{ fontSize: '12px', color: 'var(--text)', display: 'block', marginBottom: '6px' }}>📖 Discord Webhook Setup Guide</b>
+                    <ol style={{ fontSize: '11px', color: 'var(--muted)', margin: '0 0 0 16px', padding: 0, lineHeight: '1.8' }}>
+                      <li>Open <b>Discord</b> and create or select a <b>Server</b> (click the <b>+</b> icon in the left sidebar).</li>
+                      <li>Create or select a <b>Text Channel</b> where you want alerts to appear (e.g. <code>#iot-alerts</code>).</li>
+                      <li>Click the <b>⚙ gear icon</b> next to the channel name → <b>Integrations</b> → <b>Webhooks</b>.</li>
+                      <li>Click <b>New Webhook</b>, give it a name (e.g. "IoTCloud Alerts"), then click <b>Copy Webhook URL</b>.</li>
+                      <li>Paste the copied URL above and click <b>Create Connector</b>.</li>
+                    </ol>
+                    <small style={{ display: 'block', marginTop: '8px', fontSize: '10px', color: 'var(--muted)' }}>
+                      💡 The URL looks like: <code>https://discord.com/api/webhooks/123.../abc...</code>
+                    </small>
+                  </div>
+                </>
               )}
 
               {kind === 'telegram' && (
@@ -1039,21 +1041,46 @@ function Credentials({project}:{project:any}){
                       type="password"
                       value={smtpPass}
                       onChange={e => setSmtpPass(e.target.value)}
-                      placeholder="SMTP Account Password"
+                      placeholder="App Password (not your regular password)"
                     />
                   </label>
+                  <div style={{ background: 'var(--panel)', border: '1px solid var(--border)', borderRadius: '8px', padding: '12px', marginTop: '12px' }}>
+                    <b style={{ fontSize: '12px', color: 'var(--text)', display: 'block', marginBottom: '6px' }}>📖 Gmail SMTP Setup Guide</b>
+                    <ol style={{ fontSize: '11px', color: 'var(--muted)', margin: '0 0 0 16px', padding: 0, lineHeight: '1.8' }}>
+                      <li>Go to <b>myaccount.google.com</b> → <b>Security</b> → enable <b>2-Step Verification</b>.</li>
+                      <li>Search for <b>App Passwords</b> in your Google Account settings.</li>
+                      <li>Generate a new App Password (select "Mail"), and copy the <b>16-character code</b>.</li>
+                      <li>Use Host: <code>smtp.gmail.com</code>, Port: <code>587</code>, Username: your Gmail address, Password: the App Password.</li>
+                    </ol>
+                    <small style={{ display: 'block', marginTop: '8px', fontSize: '10px', color: 'var(--muted)' }}>
+                      ⚠️ Use an <b>App Password</b>, not your regular Gmail password. Regular passwords won't work with SMTP.
+                    </small>
+                  </div>
                 </>
               )}
 
               {kind === 'webhook' && (
-                <label>
-                  Webhook URL
-                  <input
-                    value={webhookUrl}
-                    onChange={e => setWebhookUrl(e.target.value)}
-                    placeholder="https://api.myplatform.com/v1/telemetry-receiver"
-                  />
-                </label>
+                <>
+                  <label>
+                    Webhook Endpoint URL
+                    <input
+                      value={webhookUrl}
+                      onChange={e => setWebhookUrl(e.target.value)}
+                      placeholder="https://api.myplatform.com/v1/telemetry-receiver"
+                    />
+                  </label>
+                  <div style={{ background: 'var(--panel)', border: '1px solid var(--border)', borderRadius: '8px', padding: '12px', marginTop: '12px' }}>
+                    <b style={{ fontSize: '12px', color: 'var(--text)', display: 'block', marginBottom: '6px' }}>📖 Webhook Setup Guide</b>
+                    <ol style={{ fontSize: '11px', color: 'var(--muted)', margin: '0 0 0 16px', padding: 0, lineHeight: '1.8' }}>
+                      <li>Enter the <b>full HTTPS URL</b> of your API endpoint that will receive event payloads.</li>
+                      <li>The endpoint must accept <b>POST</b> requests with a JSON body.</li>
+                      <li>IoTCloud will send <code>{"{"}"event":"...","data":{"{"}...{"}"}{"}"}</code> payloads when workflows trigger this action.</li>
+                    </ol>
+                    <small style={{ display: 'block', marginTop: '8px', fontSize: '10px', color: 'var(--muted)' }}>
+                      💡 Use services like <b>Zapier</b>, <b>Make.com</b>, or <b>n8n</b> webhook URLs for no-code integrations.
+                    </small>
+                  </div>
+                </>
               )}
             </div>
 
