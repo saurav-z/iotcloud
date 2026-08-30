@@ -4,272 +4,355 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>IoTCloud Device Simulator</title>
+<link href="https://fonts.googleapis.com/css2?family=Comfortaa:wght@500;700&family=Fredoka:wght@400;500;600;700&family=Quicksand:wght@500;700&display=swap" rel="stylesheet">
 <style>
   :root {
-    color-scheme: dark;
-    --bg: #0b0f19;
-    --panel: #111827;
-    --border: #1e293b;
-    --muted: #64748b;
-    --text: #e2e8f0;
-    --accent: #0ea5e9;
-    --accent-2: #38bdf8;
-    --success: #22c55e;
-    --error: #ef4444;
-    --warn: #f59e0b;
-    --purple: #a855f7;
-    --teal: #14b8a6;
+    color-scheme: light;
+    --bg: #faf9f6;
+    --panel: #ffffff;
+    --border: #2c2937;
+    --text: #2c2937;
+    --muted: #726f83;
+    
+    /* Playful Pastels */
+    --pastel-lavender: #eae4ff;
+    --pastel-blue: #d6eeff;
+    --pastel-mint: #d0f6e9;
+    --pastel-pink: #ffdce6;
+    --pastel-yellow: #fff3c3;
+    --pastel-orange: #ffe6d4;
+
+    /* Accents */
+    --accent: #8b6aff;
+    --success: #5ccda3;
+    --error: #f78ba7;
+    --warn: #ffc97a;
+    --purple: #cca3ff;
+    --teal: #94efdf;
   }
+
   * { box-sizing: border-box; }
   html, body { margin: 0; padding: 0; }
   body {
-    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+    font-family: 'Fredoka', 'Quicksand', system-ui, sans-serif;
     background: var(--bg);
+    background: radial-gradient(circle at 80% 20%, rgba(255, 230, 212, 0.4) 0%, rgba(234, 228, 255, 0.4) 50%, var(--bg) 100%);
     color: var(--text);
     min-height: 100vh;
   }
+
   header {
     position: sticky;
     top: 0;
     z-index: 10;
-    background: #0f172a;
-    border-bottom: 1px solid var(--border);
-    padding: 12px 16px;
+    background: rgba(250, 249, 246, 0.95);
+    border-bottom: 4px solid var(--border);
+    padding: 16px 24px;
     display: flex;
     align-items: center;
     justify-content: space-between;
-    gap: 12px;
+    gap: 16px;
     flex-wrap: wrap;
+    border-radius: 0 0 24px 24px;
+    box-shadow: 0 4px 0 rgba(44, 41, 55, 0.05);
   }
   .brand {
     display: flex;
     align-items: center;
-    gap: 10px;
+    gap: 12px;
   }
   .brand h1 {
     margin: 0;
-    font-size: 14px;
+    font-family: 'Comfortaa', sans-serif;
+    font-size: 18px;
     font-weight: 700;
-    letter-spacing: 0.08em;
-    text-transform: uppercase;
-    color: var(--accent-2);
+    color: var(--text);
   }
   .controls {
     display: flex;
     align-items: center;
-    gap: 10px;
+    gap: 12px;
     flex-wrap: wrap;
   }
   select, button, input, textarea {
-    background: var(--panel);
-    border: 1px solid var(--border);
+    background: #ffffff;
+    border: 3px solid var(--border);
     color: var(--text);
-    padding: 8px 10px;
-    border-radius: 6px;
+    padding: 10px 14px;
+    border-radius: 12px;
     font-family: inherit;
-    font-size: 12px;
+    font-size: 13px;
+    font-weight: 600;
     outline: none;
+    transition: all 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+    box-shadow: inset 2px 2px 0px rgba(0,0,0,0.05);
   }
-  select:focus, input:focus, textarea:focus { border-color: var(--accent-2); }
+  select:focus, input:focus, textarea:focus { 
+    border-color: var(--accent);
+    box-shadow: 3px 3px 0 var(--border);
+    transform: translate(-1px, -1px);
+  }
   button {
-    background: var(--accent);
-    color: #0f172a;
-    border: none;
+    background: var(--pastel-pink);
+    border: 3px solid var(--border);
+    box-shadow: 3px 3px 0 var(--border);
     font-weight: 700;
     cursor: pointer;
-    padding: 8px 12px;
   }
-  button:hover { background: var(--accent-2); }
-  button:disabled { opacity: 0.5; cursor: not-allowed; }
+  button:hover { 
+    background: #ffc9d6;
+    transform: translate(-2px, -2px);
+    box-shadow: 5px 5px 0 var(--border);
+  }
+  button:active {
+    transform: translate(1px, 1px);
+    box-shadow: 1px 1px 0 var(--border);
+  }
+  button:disabled { 
+    opacity: 0.5; 
+    cursor: not-allowed; 
+    transform: none !important;
+    box-shadow: 3px 3px 0 var(--border) !important;
+  }
   button.ghost {
     background: transparent;
     color: var(--text);
-    border: 1px solid var(--border);
+    box-shadow: 2px 2px 0 var(--border);
   }
+  button.ghost:hover {
+    background: rgba(255, 255, 255, 0.4);
+  }
+  
   .badge {
     display: inline-flex;
     align-items: center;
     gap: 8px;
-    padding: 6px 10px;
-    border-radius: 9999px;
-    font-size: 11px;
-    background: var(--panel);
-    border: 1px solid var(--border);
+    padding: 6px 12px;
+    border-radius: 20px;
+    font-size: 12px;
+    font-weight: 700;
+    background: #ffffff;
+    border: 2px solid var(--border);
+    box-shadow: 2px 2px 0 var(--border);
   }
   .dot {
-    width: 8px;
-    height: 8px;
+    width: 10px;
+    height: 10px;
     border-radius: 50%;
     background: var(--muted);
+    border: 2px solid var(--border);
   }
-  .dot.on { background: var(--success); box-shadow: 0 0 8px var(--success); }
-  .dot.off { background: var(--error); }
+  .dot.on { 
+    background: var(--success); 
+    box-shadow: 0 0 6px var(--success); 
+  }
+  .dot.off { 
+    background: var(--error); 
+    box-shadow: 0 0 6px var(--error);
+  }
+
   main {
-    padding: 16px;
+    padding: 24px;
     display: grid;
     grid-template-columns: 1fr;
-    gap: 16px;
-    max-width: 1400px;
+    gap: 24px;
+    max-width: 1300px;
     margin: 0 auto;
   }
   @media (min-width: 960px) {
     main {
-      grid-template-columns: 360px 1fr;
+      grid-template-columns: 380px 1fr;
     }
     .span-full { grid-column: 1 / -1; }
   }
+
+  /* Asymmetric Panels */
   .panel {
-    background: var(--panel);
-    border: 1px solid var(--border);
-    border-radius: 8px;
-    padding: 14px;
+    background: #ffffff;
+    border: 3px solid var(--border);
+    border-radius: 24px 12px 20px 16px;
+    padding: 20px;
+    box-shadow: 6px 6px 0px 0px var(--border);
+    transition: all 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+  }
+  .panel:hover {
+    transform: translateY(-2px);
+    box-shadow: 8px 8px 0px 0px var(--border);
   }
   .panel h2 {
-    margin: 0 0 10px 0;
-    font-size: 11px;
+    margin: 0 0 14px 0;
+    font-family: 'Comfortaa', sans-serif;
+    font-size: 15px;
     text-transform: uppercase;
-    letter-spacing: 0.1em;
+    letter-spacing: 1px;
     color: var(--muted);
+    font-weight: 700;
   }
+
   .kv {
     display: grid;
     grid-template-columns: 1fr;
-    gap: 8px;
+    gap: 10px;
   }
   .kv .item {
-    background: var(--bg);
-    border: 1px solid var(--border);
-    border-radius: 6px;
-    padding: 8px 10px;
+    background: #ffffff;
+    border: 3px solid var(--border);
+    border-radius: 12px;
+    padding: 10px 12px;
     display: flex;
     justify-content: space-between;
     align-items: center;
-    gap: 8px;
+    gap: 12px;
+    box-shadow: 2px 2px 0 var(--border);
   }
   .kv .item label {
-    font-size: 10px;
+    font-size: 11px;
+    font-weight: 700;
     text-transform: uppercase;
     color: var(--muted);
   }
   .kv .item .val {
-    font-size: 11px;
+    font-size: 12px;
+    font-weight: 600;
     word-break: break-all;
     text-align: right;
     color: var(--text);
   }
-  .row { display: flex; gap: 8px; flex-wrap: wrap; }
-  .field { display: flex; flex-direction: column; gap: 4px; flex: 1; min-width: 120px; }
-  .field label { font-size: 10px; text-transform: uppercase; color: var(--muted); letter-spacing: 0.05em; }
-  textarea, input[type="text"] {
-    width: 100%;
-    background: var(--bg);
-    border: 1px solid var(--border);
-    color: var(--text);
-    padding: 8px;
-    border-radius: 6px;
-    font-family: inherit;
-    font-size: 12px;
-    outline: none;
-    resize: vertical;
-  }
-  textarea:focus, input[type="text"]:focus { border-color: var(--accent-2); }
+
+  .row { display: flex; gap: 12px; flex-wrap: wrap; }
+  .field { display: flex; flex-direction: column; gap: 6px; flex: 1; min-width: 140px; }
+  .field label { font-size: 11px; font-weight: 700; text-transform: uppercase; color: var(--muted); }
+  
   .tabs {
     display: flex;
-    gap: 6px;
+    gap: 8px;
     flex-wrap: wrap;
-    margin-bottom: 10px;
+    margin-bottom: 16px;
   }
   .tab {
-    padding: 6px 10px;
-    border-radius: 6px;
-    border: 1px solid var(--border);
-    background: var(--bg);
+    padding: 8px 14px;
+    border-radius: 12px;
+    border: 3px solid var(--border);
+    background: #ffffff;
     color: var(--text);
     cursor: pointer;
-    font-size: 11px;
+    font-size: 12px;
+    font-weight: 700;
+    box-shadow: 2px 2px 0 var(--border);
   }
   .tab.active {
-    background: var(--accent);
-    color: #0f172a;
-    border-color: var(--accent);
-    font-weight: 700;
+    background: var(--pastel-lavender);
+    box-shadow: 4px 4px 0 var(--border);
+    transform: translate(-1px, -1px);
   }
+
+  /* Code blocks styling */
   .code {
-    background: #070b14;
-    border: 1px solid var(--border);
-    border-radius: 6px;
-    padding: 10px;
-    font-size: 11px;
-    line-height: 1.55;
+    background: #2c2937;
+    border: 3px solid var(--border);
+    border-radius: 16px;
+    padding: 16px;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+    font-size: 12px;
+    line-height: 1.6;
     overflow-x: auto;
     white-space: pre;
-    color: #cbd5e1;
+    color: #ffdae2;
     position: relative;
+    box-shadow: 4px 4px 0 var(--border);
   }
-  .code .kw { color: #c084fc; }
-  .code .str { color: #86efac; }
-  .code .num { color: #fca5a5; }
-  .code .cmt { color: #64748b; }
+  .code .kw { color: #cca3ff; font-weight: bold; }
+  .code .str { color: #d0f6e9; }
+  .code .num { color: #ffc97a; }
+  .code .cmt { color: #8e8a9f; font-style: italic; }
+
   .copy-btn {
     position: absolute;
     top: 8px;
     right: 8px;
-    background: var(--panel);
+    background: #ffffff;
     color: var(--text);
-    border: 1px solid var(--border);
-    border-radius: 6px;
+    border: 3px solid var(--border);
+    border-radius: 8px;
     padding: 4px 8px;
-    font-size: 10px;
-    cursor: pointer;
-  }
-  .copy-btn:hover { border-color: var(--accent-2); }
-  .log {
-    background: #070b14;
-    border: 1px solid var(--border);
-    border-radius: 6px;
-    padding: 10px;
-    height: 45vh;
-    overflow-y: auto;
     font-size: 11px;
-    line-height: 1.6;
+    font-weight: 700;
+    cursor: pointer;
+    box-shadow: 2px 2px 0 var(--border);
+  }
+  .copy-btn:hover { 
+    background: var(--pastel-blue); 
+    transform: translate(-1px, -1px);
+    box-shadow: 3px 3px 0 var(--border);
+  }
+
+  .log {
+    background: #ffffff;
+    border: 3px solid var(--border);
+    border-radius: 16px;
+    padding: 16px;
+    height: 400px;
+    overflow-y: auto;
+    font-size: 12px;
+    font-family: ui-monospace, Consolas, monospace;
+    box-shadow: inset 2px 2px 0 rgba(0,0,0,0.05);
   }
   .log-entry {
-    padding: 4px 0;
-    border-bottom: 1px solid #0b101b;
+    padding: 8px;
+    border-bottom: 2px solid var(--bg);
     display: flex;
-    gap: 10px;
+    gap: 12px;
     align-items: flex-start;
   }
   .log-entry:last-child { border-bottom: none; }
-  .log-time { color: var(--muted); white-space: nowrap; }
+  .log-time { color: var(--muted); white-space: nowrap; font-weight: 600; }
   .log-type {
     font-weight: 700;
-    min-width: 70px;
+    min-width: 80px;
     text-transform: uppercase;
-    font-size: 9px;
-    padding-top: 2px;
+    font-size: 10px;
+    padding: 2px 6px;
+    border-radius: 6px;
+    border: 2px solid var(--border);
+    text-align: center;
+    box-shadow: 1px 1px 0 var(--border);
   }
-  .log-type.ready { color: var(--success); }
-  .log-type.info { color: var(--accent-2); }
-  .log-type.error { color: var(--error); }
-  .log-type.mqtt { color: var(--purple); }
-  .log-type.device { color: var(--warn); }
-  .log-type.schedule { color: var(--teal); }
-  .log-data { color: var(--text); word-break: break-all; }
-  .empty { color: var(--muted); font-style: italic; padding: 6px 0; }
+  .log-type.ready { background: var(--pastel-mint); }
+  .log-type.info { background: var(--pastel-blue); }
+  .log-type.error { background: var(--pastel-pink); }
+  .log-type.mqtt { background: var(--pastel-lavender); }
+  .log-type.device { background: var(--pastel-orange); }
+  .log-type.schedule { background: var(--pastel-yellow); }
+  
+  .log-data { 
+    color: var(--text); 
+    word-break: break-all; 
+    line-height: 1.4;
+    font-weight: 600;
+  }
+  .empty { 
+    color: var(--muted); 
+    font-style: italic; 
+    padding: 20px; 
+    text-align: center; 
+    font-weight: 600;
+  }
+  
   .toast {
     position: fixed;
-    bottom: 16px;
-    right: 16px;
-    background: var(--panel);
-    border: 1px solid var(--border);
+    bottom: 24px;
+    right: 24px;
+    background: var(--pastel-yellow);
+    border: 3px solid var(--border);
     color: var(--text);
-    padding: 10px 14px;
-    border-radius: 8px;
-    font-size: 12px;
+    padding: 10px 16px;
+    border-radius: 12px;
+    font-size: 13px;
+    font-weight: 700;
+    box-shadow: 4px 4px 0 var(--border);
     opacity: 0;
     transform: translateY(10px);
-    transition: all 0.2s;
+    transition: all 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275);
     pointer-events: none;
     z-index: 100;
   }
@@ -281,6 +364,7 @@
 <body>
   <header>
     <div class="brand">
+      <div class="brandMark">◈</div>
       <h1>IoTCloud Device Simulator</h1>
       <span class="badge"><span id="statusDot" class="dot off"></span><span id="statusText">Disconnected</span></span>
     </div>
@@ -292,35 +376,52 @@
 
   <main>
     <section class="panel">
-      <h2>Connection</h2>
-      <div class="kv">
-        <div class="item"><label>Base URL</label><span class="val" id="baseUrl">https://iotcloud-api-a04c.onrender.com</span></div>
-        <div class="item"><label>WebSocket</label><span class="val" id="wsUrl">wss://iotcloud-api-a04c.onrender.com/v1/ws</span></div>
-        <div class="item"><label>Project ID</label><span class="val" id="projectId">136d4c58-f0fb-4b3b-862a-b3d17b2d651d</span></div>
-        <div class="item"><label>Device ID</label><span class="val" id="deviceId">esp1</span></div>
-        <div class="item"><label>Device Token</label><span class="val" id="deviceToken">dev_VlStdrPKsNGazh11zzXuS3DNd6WyWm0f</span></div>
+      <h2>Connection Configuration</h2>
+      <div style="display: flex; flex-direction: column; gap: 12px; margin-top: 8px;">
+        <div class="field">
+          <label for="apiBaseInput">API Base URL</label>
+          <input id="apiBaseInput" value="" placeholder="http://localhost:10000" />
+        </div>
+        <div class="field">
+          <label for="deviceTokenInput">Device Token</label>
+          <input id="deviceTokenInput" value="" placeholder="dev_..." />
+        </div>
+        <div class="field">
+          <label for="deviceIdInput">Device ID</label>
+          <input id="deviceIdInput" value="" placeholder="esp1" />
+        </div>
+        <div class="field">
+          <label for="projectIdInput">Project ID</label>
+          <input id="projectIdInput" value="" placeholder="UUID (Fills on Connect)" />
+        </div>
+      </div>
+      <div style="margin-top: 14px; display: flex; gap: 8px;">
+        <button id="saveConfigBtn" class="outlineBtn" style="flex: 1;">Save Config</button>
+        <button id="resetConfigBtn" class="ghost">Reset Defaults</button>
       </div>
     </section>
 
-    <section class="panel">
-      <h2>Publish Telemetry</h2>
-      <form id="publishForm" class="row">
-        <div class="field">
-          <label for="topic">Topic</label>
-          <input id="topic" value="telemetry" required />
-        </div>
-        <div class="field" style="flex:2">
-          <label for="payload">Payload (JSON)</label>
-          <input id="payload" value='{"temperature":28.4,"humidity":60}' required />
-        </div>
-        <button type="submit" id="publishBtn" disabled>Publish</button>
-      </form>
-    </section>
+    <div style="display: flex; flex-direction: column; gap: 24px;">
+      <section class="panel">
+        <h2>Publish Telemetry</h2>
+        <form id="publishForm" class="row">
+          <div class="field">
+            <label for="topic">Topic</label>
+            <input id="topic" value="telemetry" required />
+          </div>
+          <div class="field" style="flex:2">
+            <label for="payload">Payload (JSON)</label>
+            <input id="payload" value='{"temperature":28.4,"humidity":60}' required />
+          </div>
+          <button type="submit" id="publishBtn" disabled style="align-self: flex-end; height: 45px;">Publish Event</button>
+        </form>
+      </section>
 
-    <section class="panel span-full">
-      <h2>Events</h2>
-      <div id="log" class="log"><div class="empty">Waiting for events...</div></div>
-    </section>
+      <section class="panel">
+        <h2>Events Log</h2>
+        <div id="log" class="log"><div class="empty">Waiting for events stream...</div></div>
+      </section>
+    </div>
 
     <section class="panel span-full">
       <h2>API Documentation</h2>
@@ -335,7 +436,7 @@
       <div id="doc-general" class="doc-section active">
         <div class="code"><button class="copy-btn" data-copy="general">Copy</button><span class="cmt"># IoTCloud API Overview</span>
 
-Base: <span class="str">https://iotcloud-api-a04c.onrender.com</span>
+Base: <span class="str" id="docBaseUrl">http://localhost:10000</span>
 
 Protocols:
   - REST/HTTP   → /api/*
@@ -352,11 +453,11 @@ Browser clients use HTTPS/WSS automatically.</div>
       <div id="doc-rest" class="doc-section">
         <div class="code"><button class="copy-btn" data-copy="rest">Copy</button><span class="cmt"># Publish telemetry via REST</span>
 
-curl -X POST <span class="str">https://iotcloud-api-a04c.onrender.com/api/device/publish</span> \
-  -H <span class="str">'Authorization: Bearer DEVICE_TOKEN'</span> \
+curl -X POST <span class="str" id="docCurlUrl">http://localhost:10000/api/device/publish</span> \
+  -H <span class="str">'Authorization: Bearer YOUR_DEVICE_TOKEN'</span> \
   -H <span class="str">'content-type: application/json'</span> \
   -d <span class="str">'{
-    "deviceId": "DEVICE_ID",
+    "deviceId": "YOUR_DEVICE_ID",
     "topic": "telemetry",
     "data": {"temperature": 28.4}
   }'</span>
@@ -372,7 +473,7 @@ Response <span class="num">403</span>:
         <div class="code"><button class="copy-btn" data-copy="ws">Copy</button><span class="cmt"># WebSocket event stream</span>
 
 const ws = <span class="kw">new</span> WebSocket(
-  <span class="str">'wss://iotcloud-api-a04c.onrender.com/v1/ws?token=DEVICE_TOKEN'</span>
+  <span class="str" id="docWsUrl">ws://localhost:10000/v1/ws?token=YOUR_DEVICE_TOKEN</span>
 );
 
 ws.onopen    = () => console.log(<span class="str">'connected'</span>);
@@ -394,10 +495,10 @@ Publish:
 Topic: <span class="str">iotcloud/{projectId}/{deviceId}/{topic}</span>
 
 Example:
-  iotcloud/136d4c58-f0fb-4b3b-862a-b3d17b2d651d/esp1/telemetry
+  iotcloud/<span class="str" id="docMqttProjId">PROJECT_ID</span>/<span class="str" id="docMqttDevId">DEVICE_ID</span>/telemetry
 
 Python (paho-mqtt):
-  client.connect(<span class="str">'iotcloud-api-a04c.onrender.com'</span>, <span class="num">443</span>, <span class="num">60</span>)
+  client.connect(<span class="str" id="docMqttHost">localhost</span>, <span class="num">443</span>, <span class="num">60</span>)
   client.publish(
     <span class="str">'iotcloud/PROJECT_ID/DEVICE_ID/telemetry'</span>,
     json.dumps({<span class="str">'temperature'</span>: <span class="num">28.4</span>})
@@ -407,16 +508,16 @@ Python (paho-mqtt):
       <div id="doc-ai" class="doc-section">
         <div class="code"><button class="copy-btn" data-copy="ai">Copy</button><span class="cmt"># AI Context for IoTCloud troubleshooting</span>
 
-Project ID: <span class="str">136d4c58-f0fb-4b3b-862a-b3d17b2d651d</span>
-Device ID:  <span class="str" id="aiDeviceId">esp1</span>
-Device Token: <span class="str">dev_VlStdrPKsNGazh11zzXuS3DNd6WyWm0f</span>
+Project ID:   <span class="str" id="aiProjectId">YOUR_PROJECT_ID</span>
+Device ID:    <span class="str" id="aiDeviceId">YOUR_DEVICE_ID</span>
+Device Token: <span class="str" id="aiDeviceToken">YOUR_DEVICE_TOKEN</span>
 
-Base URL:   <span class="str">https://iotcloud-api-a04c.onrender.com</span>
-WebSocket:  <span class="str">wss://iotcloud-api-a04c.onrender.com/v1/ws?token=DEVICE_TOKEN</span>
-SSE:        <span class="str">https://iotcloud-api-a04c.onrender.com/v1/events?token=DEVICE_TOKEN</span>
-MQTT/WS:    <span class="str">wss://iotcloud-api-a04c.onrender.com/mqtt</span>
+Base URL:     <span class="str" id="aiBaseUrl">http://localhost:10000</span>
+WebSocket:    <span class="str" id="aiWsUrl">ws://localhost:10000/v1/ws?token=DEVICE_TOKEN</span>
+SSE:          <span class="str" id="aiSseUrl">http://localhost:10000/v1/events?token=DEVICE_TOKEN</span>
+MQTT/WS:      <span class="str" id="aiMqttUrl">ws://localhost:10000/mqtt</span>
 
-Topic:      <span class="str">iotcloud/PROJECT_ID/DEVICE_ID/telemetry</span></div>
+Topic:        <span class="str" id="aiTopic">iotcloud/PROJECT_ID/DEVICE_ID/telemetry</span></div>
       </div>
     </section>
   </main>
@@ -424,10 +525,24 @@ Topic:      <span class="str">iotcloud/PROJECT_ID/DEVICE_ID/telemetry</span></di
   <div id="toast" class="toast">Copied to clipboard</div>
 
 <script>
-const BASE = 'https://iotcloud-api-a04c.onrender.com';
-const WS_URL = `${BASE}/v1/ws?token=dev_VlStdrPKsNGazh11zzXuS3DNd6WyWm0f`;
-const PROJECT_ID = '136d4c58-f0fb-4b3b-862a-b3d17b2d651d';
-const DEFAULT_DEVICE_ID = 'esp1';
+// Default configuration fallbacks
+const DEFAULT_BASE = window.location.origin.includes('localhost') || window.location.origin.includes('127.0.0.1')
+  ? 'http://localhost:10000'
+  : 'https://iotcloud-api-a04c.onrender.com';
+const DEFAULT_TOKEN = 'dev_VlStdrPKsNGazh11zzXuS3DNd6WyWm0f';
+const DEFAULT_PROJECT_ID = '136d4c58-f0fb-4b3b-862a-b3d17b2d651d';
+const DEFAULT_DEVICE_ID = '5b566b64-373d-4b47-94c0-0deb81274841';
+
+// Load from LocalStorage
+const apiBaseInput = document.getElementById('apiBaseInput');
+const deviceTokenInput = document.getElementById('deviceTokenInput');
+const deviceIdInput = document.getElementById('deviceIdInput');
+const projectIdInput = document.getElementById('projectIdInput');
+
+apiBaseInput.value = localStorage.getItem('sim_api_base') || DEFAULT_BASE;
+deviceTokenInput.value = localStorage.getItem('sim_device_token') || DEFAULT_TOKEN;
+deviceIdInput.value = localStorage.getItem('sim_device_id') || DEFAULT_DEVICE_ID;
+projectIdInput.value = localStorage.getItem('sim_project_id') || DEFAULT_PROJECT_ID;
 
 const statusDot = document.getElementById('statusDot');
 const statusText = document.getElementById('statusText');
@@ -436,8 +551,8 @@ const publishForm = document.getElementById('publishForm');
 const publishBtn = document.getElementById('publishBtn');
 const connectBtn = document.getElementById('connectBtn');
 const deviceSelect = document.getElementById('deviceSelect');
-const deviceIdEl = document.getElementById('deviceId');
-const aiDeviceId = document.getElementById('aiDeviceId');
+const saveConfigBtn = document.getElementById('saveConfigBtn');
+const resetConfigBtn = document.getElementById('resetConfigBtn');
 
 let socket = null;
 let connected = false;
@@ -446,6 +561,7 @@ function setStatus(on) {
   connected = on;
   statusDot.className = on ? 'dot on' : 'dot off';
   statusText.textContent = on ? 'Connected' : 'Disconnected';
+  connectBtn.textContent = on ? 'Disconnect' : 'Connect';
   publishBtn.disabled = !on;
 }
 
@@ -475,18 +591,83 @@ function appendLog(type, data) {
   logEl.scrollTop = logEl.scrollHeight;
 }
 
+function updateDocs() {
+  const base = apiBaseInput.value.trim().replace(/\/+$/, '');
+  const token = deviceTokenInput.value.trim();
+  const deviceId = deviceIdInput.value.trim();
+  const projectId = projectIdInput.value.trim();
+
+  const wsProtocol = base.startsWith('https') ? 'wss://' : 'ws://';
+  const wsHost = base.replace(/^https?:\/\//i, '');
+  const wsUrl = `${wsProtocol}${wsHost}/v1/ws?token=${token}`;
+  const sseUrl = `${base}/v1/events?token=${token}`;
+  const mqttUrl = `${wsProtocol}${wsHost}/mqtt`;
+
+  document.getElementById('docBaseUrl').textContent = base;
+  document.getElementById('docCurlUrl').textContent = `${base}/api/device/publish`;
+  document.getElementById('docWsUrl').textContent = wsUrl;
+  document.getElementById('docMqttProjId').textContent = projectId;
+  document.getElementById('docMqttDevId').textContent = deviceId;
+  document.getElementById('docMqttHost').textContent = wsHost;
+
+  document.getElementById('aiProjectId').textContent = projectId;
+  document.getElementById('aiDeviceId').textContent = deviceId;
+  document.getElementById('aiDeviceToken').textContent = token;
+  document.getElementById('aiBaseUrl').textContent = base;
+  document.getElementById('aiWsUrl').textContent = wsUrl;
+  document.getElementById('aiSseUrl').textContent = sseUrl;
+  document.getElementById('aiMqttUrl').textContent = mqttUrl;
+  document.getElementById('aiTopic').textContent = `iotcloud/${projectId}/${deviceId}/telemetry`;
+}
+
+function saveConfig() {
+  localStorage.setItem('sim_api_base', apiBaseInput.value.trim());
+  localStorage.setItem('sim_device_token', deviceTokenInput.value.trim());
+  localStorage.setItem('sim_device_id', deviceIdInput.value.trim());
+  localStorage.setItem('sim_project_id', projectIdInput.value.trim());
+  showToast('Configuration saved!');
+  updateDocs();
+}
+
+function resetConfig() {
+  apiBaseInput.value = DEFAULT_BASE;
+  deviceTokenInput.value = DEFAULT_TOKEN;
+  deviceIdInput.value = DEFAULT_DEVICE_ID;
+  projectIdInput.value = DEFAULT_PROJECT_ID;
+  saveConfig();
+  showToast('Configuration reset to defaults!');
+}
+
 function connect() {
   if (socket) {
     socket.close();
     socket = null;
+    setStatus(false);
+    return;
   }
 
-  appendLog('info', `Connecting to ${WS_URL}`);
-  socket = new WebSocket(WS_URL);
+  saveConfig();
+
+  const apiBase = apiBaseInput.value.trim().replace(/\/+$/, '');
+  const token = deviceTokenInput.value.trim();
+
+  // Calculate the correct WebSocket URL with correct protocols (ws:// / wss://)
+  const wsProtocol = apiBase.startsWith('https') ? 'wss://' : 'ws://';
+  const wsHost = apiBase.replace(/^https?:\/\//i, '');
+  const wsUrl = `${wsProtocol}${wsHost}/v1/ws?token=${token}`;
+
+  appendLog('info', `Connecting to ${wsUrl}`);
+  
+  try {
+    socket = new WebSocket(wsUrl);
+  } catch (err) {
+    appendLog('error', `WebSocket creation failed: ${err.message}`);
+    return;
+  }
 
   socket.onopen = () => {
     setStatus(true);
-    appendLog('info', 'WebSocket opened');
+    appendLog('info', 'WebSocket connected successfully');
   };
 
   socket.onmessage = (event) => {
@@ -494,21 +675,33 @@ function connect() {
       const msg = JSON.parse(event.data);
       const type = msg.type || 'unknown';
       appendLog(type, msg);
+      
+      // Dynamically populate fields returned from ready message
+      if (type === 'ready') {
+        if (msg.projectId) {
+          projectIdInput.value = msg.projectId;
+          localStorage.setItem('sim_project_id', msg.projectId);
+        }
+        if (msg.deviceId) {
+          deviceIdInput.value = msg.deviceId;
+          localStorage.setItem('sim_device_id', msg.deviceId);
+        }
+        updateDocs();
+      }
     } catch {
       appendLog('unknown', event.data);
     }
   };
 
   socket.onerror = (err) => {
-    appendLog('error', 'WebSocket error');
-    console.error('WebSocket error', err);
+    appendLog('error', 'WebSocket encounterd an error');
+    console.error(err);
   };
 
   socket.onclose = (event) => {
     setStatus(false);
-    appendLog('info', `WebSocket closed (code=${event.code}, reason=${event.reason || 'none'})`);
+    appendLog('info', `WebSocket connection closed (code=${event.code}, reason=${event.reason || 'none'})`);
     socket = null;
-    setTimeout(connect, 3000);
   };
 }
 
@@ -540,18 +733,17 @@ publishForm.addEventListener('submit', (e) => {
 });
 
 connectBtn.addEventListener('click', () => {
-  if (!connected) {
-    connect();
-  } else {
-    if (socket) socket.close();
-  }
+  connect();
 });
+
+saveConfigBtn.addEventListener('click', saveConfig);
+resetConfigBtn.addEventListener('click', resetConfig);
 
 function showToast(msg) {
   const toast = document.getElementById('toast');
   toast.textContent = msg;
   toast.classList.add('show');
-  setTimeout(() => toast.classList.remove('show'), 1200);
+  setTimeout(() => toast.classList.remove('show'), 1500);
 }
 
 document.querySelectorAll('.copy-btn').forEach((btn) => {
@@ -589,12 +781,14 @@ devices.forEach(d => {
 });
 
 deviceSelect.addEventListener('change', () => {
-  const id = deviceSelect.value || DEFAULT_DEVICE_ID;
-  deviceIdEl.textContent = id;
-  aiDeviceId.textContent = id;
+  if (deviceSelect.value) {
+    deviceIdInput.value = deviceSelect.value;
+    updateDocs();
+  }
 });
 
-connect();
+// Initial docs update
+updateDocs();
 </script>
 </body>
 </html>

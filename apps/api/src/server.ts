@@ -682,7 +682,6 @@ broker.on(
   'publish',
   async (packet, client) => {
     if (
-      !client ||
       packet.topic.startsWith('$SYS')
     ) {
       return;
