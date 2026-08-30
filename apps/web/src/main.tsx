@@ -665,14 +665,102 @@ function NodeForm({node,setNodes,devices,credentials}:{node:Node;setNodes:any;de
     })()}
 
     {t==='action.discord.send' && <>
-      <label>Credential
+      <label>Discord Credential
         <select value={d.credentialId||''} onChange={e=>update('credentialId',e.target.value)}>
           <option value="">Select Discord credential...</option>
           {credentials.filter(c=>c.kind==='discord').map(c=><option key={c.id} value={c.id}>{c.name}</option>)}
         </select>
       </label>
-      <label>Message template
-        <textarea value={d.text||''} onChange={e=>update('text',e.target.value)} placeholder="🚨 Temperature {{data.temperature}}°C" rows={3}/>
+
+      <label>Card Format
+        <select value={d.useEmbed === false ? 'plain' : 'embed'} onChange={e => update('useEmbed', e.target.value === 'embed')}>
+          <option value="embed">🎨 Rich Discord Embed Card</option>
+          <option value="plain">💬 Plain Text Message</option>
+        </select>
+      </label>
+
+      {d.useEmbed !== false && (
+        <>
+          <label>Embed Title
+            <input
+              value={d.embedTitle || ''}
+              onChange={e => update('embedTitle', e.target.value)}
+              placeholder="🚨 Alert: {{deviceId}} telemetry"
+            />
+          </label>
+
+          <label>Embed Accent Color
+            <div style={{ display: 'flex', gap: '6px', marginTop: '4px', marginBottom: '8px' }}>
+              {[
+                { label: '🔴 Red', hex: '#ef4444' },
+                { label: '🟢 Green', hex: '#10b981' },
+                { label: '🔵 Blue', hex: '#3b82f6' },
+                { label: '🟡 Gold', hex: '#f59e0b' },
+              ].map(c => (
+                <button
+                  key={c.hex}
+                  type="button"
+                  className="outlineBtn"
+                  style={{
+                    fontSize: '11px',
+                    padding: '3px 8px',
+                    marginTop: 0,
+                    borderColor: d.embedColor === c.hex ? c.hex : undefined,
+                    fontWeight: d.embedColor === c.hex ? 700 : 400,
+                  }}
+                  onClick={() => update('embedColor', c.hex)}
+                >
+                  {c.label}
+                </button>
+              ))}
+            </div>
+            <input
+              value={d.embedColor || '#3b82f6'}
+              onChange={e => update('embedColor', e.target.value)}
+              placeholder="#3b82f6"
+            />
+          </label>
+        </>
+      )}
+
+      <label>Message / Description Template
+        <textarea
+          value={d.text || ''}
+          onChange={e => update('text', e.target.value)}
+          placeholder="Device **{{deviceId}}** reported temperature **{{data.temperature}}°C**"
+          rows={3}
+        />
+      </label>
+
+      <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap', marginBottom: '12px' }}>
+        {['{{data.temperature}}', '{{data.humidity}}', '{{deviceId}}', '{{topic}}', '{{timestamp}}'].map(tag => (
+          <button
+            key={tag}
+            type="button"
+            className="outlineBtn"
+            style={{ fontSize: '10px', padding: '2px 6px', marginTop: 0 }}
+            onClick={() => update('text', (d.text || '') + ' ' + tag)}
+          >
+            +{tag}
+          </button>
+        ))}
+      </div>
+
+      <label>Bot Display Name (Optional Override)
+        <input
+          value={d.username || ''}
+          onChange={e => update('username', e.target.value)}
+          placeholder="e.g. IoT Security Bot"
+        />
+      </label>
+
+      <label className="checkbox-label" style={{ marginTop: '8px' }}>
+        <input
+          type="checkbox"
+          checked={Boolean(d.tts)}
+          onChange={e => update('tts', e.target.checked)}
+        />
+        Enable Text-to-Speech (TTS Alert)
       </label>
     </>}
 
@@ -1215,6 +1303,34 @@ function Credentials({project}:{project:any}){
                       </div>
                     </div>
                   )}
+                </div>
+              );
+            })()}
+
+            {x.kind === 'discord' && (() => {
+              const inboundUrl = `${apiBase()}/v1/discord/webhook/${x.id}`;
+              return (
+                <div style={{ marginTop: '12px', borderTop: '1px solid var(--border)', paddingTop: '10px' }}>
+                  <div style={{ fontSize: '11px', color: 'var(--muted)', marginBottom: '4px' }}>
+                    ⚡ <b>Inbound Discord Webhook (Discord ➔ IoTCloud)</b>
+                  </div>
+                  <div style={{ display: 'flex', gap: '4px', alignItems: 'center' }}>
+                    <code style={{ flex: 1, fontSize: '10px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', background: 'var(--panel)', padding: '4px 6px', borderRadius: '4px', border: '1px solid var(--border)' }}>
+                      {inboundUrl}
+                    </code>
+                    <button
+                      className="outlineBtn"
+                      style={{ fontSize: '10px', padding: '2px 6px', marginTop: 0 }}
+                      onClick={async () => {
+                        try {
+                          await navigator.clipboard.writeText(inboundUrl);
+                          alert('Copied Inbound Discord Webhook URL!');
+                        } catch {}
+                      }}
+                    >
+                      Copy 📋
+                    </button>
+                  </div>
                 </div>
               );
             })()}

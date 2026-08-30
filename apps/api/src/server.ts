@@ -409,19 +409,56 @@ async function runWorkflows(event: Event) {
               return;
             }
 
-            await fetch(c.webhookUrl, {
-              method: 'POST',
-              headers: {
-                'content-type': 'application/json',
-              },
-              body: JSON.stringify({
-                content: render(
-                  node.data?.text ||
-                    JSON.stringify(currentEvent.data),
-                  currentEvent,
-                ),
-              }),
-            });
+            const webhookUrl = c.webhookUrl || c.url;
+            if (!webhookUrl) return;
+
+            const textPayload = render(
+              node.data?.text || JSON.stringify(currentEvent.data),
+              currentEvent,
+            );
+
+            const payload: any = {
+              username: node.data?.username || c.username || 'IoTCloud Alerts',
+              avatar_url: node.data?.avatarUrl || c.avatarUrl || undefined,
+              tts: Boolean(node.data?.tts),
+            };
+
+            const useEmbed = node.data?.useEmbed !== false;
+
+            if (useEmbed) {
+              let colorDecimal = 3899638; // Default blue (#3b82f6)
+              if (node.data?.embedColor) {
+                const hex = node.data.embedColor.replace('#', '');
+                const parsed = parseInt(hex, 16);
+                if (!isNaN(parsed)) colorDecimal = parsed;
+              }
+
+              payload.embeds = [
+                {
+                  title: render(node.data?.embedTitle || '⚡ IoT Event Alert', currentEvent),
+                  description: textPayload,
+                  color: colorDecimal,
+                  footer: node.data?.embedFooter
+                    ? { text: render(node.data.embedFooter, currentEvent) }
+                    : { text: 'IoTCloud Engine' },
+                  timestamp: new Date().toISOString(),
+                },
+              ];
+            } else {
+              payload.content = textPayload;
+            }
+
+            try {
+              await fetch(webhookUrl, {
+                method: 'POST',
+                headers: {
+                  'content-type': 'application/json',
+                },
+                body: JSON.stringify(payload),
+              });
+            } catch (err) {
+              console.error('[Discord Action Exception]', err);
+            }
           },
 
           async 'action.email.send'(node, currentEvent) {
@@ -2444,6 +2481,52 @@ app.post(
     }
 
     return { ok: true };
+  },
+);
+
+// Public Webhook for Discord (Two-Way Discord -> IoTCloud)
+app.post(
+  '/v1/discord/webhook/:credentialId',
+  async (req: any, reply) => {
+    const { credentialId } = req.params;
+    const body = req.body || {};
+
+    const { rows } = await pool.query(
+      `
+        SELECT project_id, secret
+        FROM credentials
+        WHERE id = $1 AND kind = 'discord'
+      `,
+      [credentialId],
+    );
+
+    if (!rows[0]) {
+      return reply.code(404).send({ error: 'Discord credential not found' });
+    }
+
+    const projectId = rows[0].project_id;
+    const content = body.content || body.text || body.message || (typeof body === 'string' ? body : JSON.stringify(body));
+    const username = body.username || body.author?.username || 'Discord User';
+    const channelId = body.channel_id || '';
+
+    const discordEvent: Event = {
+      id: crypto.randomUUID(),
+      projectId,
+      deviceId: `discord:${channelId || credentialId}`,
+      topic: 'discord/message',
+      type: 'discord.message',
+      data: {
+        content,
+        username,
+        channelId,
+        raw: body,
+      },
+      timestamp: new Date().toISOString(),
+    };
+
+    runWorkflows(discordEvent).catch(e => console.error('[Discord Workflow Ingestion Error]', e));
+
+    return { ok: true, received: true };
   },
 );
 
