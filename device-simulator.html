@@ -4,39 +4,41 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>IoTCloud Device Simulator</title>
-<link href="https://fonts.googleapis.com/css2?family=Comfortaa:wght@500;700&family=Fredoka:wght@400;500;600;700&family=Quicksand:wght@500;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Comfortaa:wght@400;600;700&family=Playfair+Display:ital,wght@0,400..900;1,400..900&family=Quicksand:wght@400;600;700&display=swap" rel="stylesheet">
 <style>
   :root {
     color-scheme: light;
-    --bg: #faf9f6;
+    --bg: #faf7f2;
     --panel: #ffffff;
-    --border: #2c2937;
-    --text: #2c2937;
-    --muted: #726f83;
+    --border: #3b3028;
+    --text: #3b3028;
+    --muted: #7d7065;
+    --gold: #b39b7d;
+    --gold-light: #f5f0e8;
     
-    /* Playful Pastels */
-    --pastel-lavender: #eae4ff;
-    --pastel-blue: #d6eeff;
-    --pastel-mint: #d0f6e9;
-    --pastel-pink: #ffdce6;
-    --pastel-yellow: #fff3c3;
-    --pastel-orange: #ffe6d4;
+    /* Organic Pastels */
+    --pastel-sage: #e3ece6;
+    --pastel-blush: #faeaeb;
+    --pastel-lavender: #ece9f2;
+    --pastel-cream: #faf5eb;
+    --pastel-sky: #e5edf5;
 
     /* Accents */
-    --accent: #8b6aff;
-    --success: #5ccda3;
-    --error: #f78ba7;
-    --warn: #ffc97a;
-    --purple: #cca3ff;
-    --teal: #94efdf;
+    --accent: #a38970;
+    --success: #8cbfa5;
+    --error: #e59a9c;
+    --warn: #e0be8d;
   }
 
-  * { box-sizing: border-box; }
+  * { 
+    box-sizing: border-box; 
+    transition: background-color 0.4s cubic-bezier(0.25, 1, 0.5, 1), border-color 0.4s cubic-bezier(0.25, 1, 0.5, 1), transform 0.4s cubic-bezier(0.25, 1, 0.5, 1), box-shadow 0.4s cubic-bezier(0.25, 1, 0.5, 1);
+  }
   html, body { margin: 0; padding: 0; }
   body {
-    font-family: 'Fredoka', 'Quicksand', system-ui, sans-serif;
+    font-family: 'Quicksand', 'Comfortaa', system-ui, sans-serif;
     background: var(--bg);
-    background: radial-gradient(circle at 80% 20%, rgba(255, 230, 212, 0.4) 0%, rgba(234, 228, 255, 0.4) 50%, var(--bg) 100%);
+    background: radial-gradient(circle at 80% 20%, rgba(227, 236, 230, 0.5) 0%, rgba(250, 234, 235, 0.3) 50%, var(--bg) 100%);
     color: var(--text);
     min-height: 100vh;
   }
@@ -45,28 +47,47 @@
     position: sticky;
     top: 0;
     z-index: 10;
-    background: rgba(250, 249, 246, 0.95);
-    border-bottom: 4px solid var(--border);
+    background: rgba(250, 247, 242, 0.95);
+    border-bottom: 2px solid var(--border);
     padding: 16px 24px;
     display: flex;
     align-items: center;
     justify-content: space-between;
     gap: 16px;
     flex-wrap: wrap;
-    border-radius: 0 0 24px 24px;
-    box-shadow: 0 4px 0 rgba(44, 41, 55, 0.05);
+    border-radius: 0 0 40px 40px;
+    box-shadow: 0 4px 15px rgba(59, 48, 40, 0.03);
   }
   .brand {
     display: flex;
     align-items: center;
     gap: 12px;
   }
+  .brandMark {
+    width: 32px;
+    height: 32px;
+    border: 2px solid var(--border);
+    background: var(--pastel-sage);
+    border-radius: 50% 50% 0 50%;
+    display: grid;
+    place-items: center;
+    color: var(--text);
+    font-size: 14px;
+    font-weight: 700;
+    box-shadow: 2px 2px 0 var(--border);
+  }
   .brand h1 {
     margin: 0;
-    font-family: 'Comfortaa', sans-serif;
-    font-size: 18px;
+    font-family: 'Playfair Display', serif;
+    font-size: 22px;
     font-weight: 700;
     color: var(--text);
+  }
+  .brand h1 span {
+    font-family: 'Playfair Display', serif;
+    font-style: italic;
+    color: var(--accent);
+    font-weight: 400;
   }
   .controls {
     display: flex;
@@ -76,7 +97,7 @@
   }
   select, button, input, textarea {
     background: #ffffff;
-    border: 3px solid var(--border);
+    border: 2px solid var(--border);
     color: var(--text);
     padding: 10px 14px;
     border-radius: 12px;
@@ -84,23 +105,22 @@
     font-size: 13px;
     font-weight: 600;
     outline: none;
-    transition: all 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275);
-    box-shadow: inset 2px 2px 0px rgba(0,0,0,0.05);
+    box-shadow: inset 2px 2px 0px rgba(0,0,0,0.02);
   }
   select:focus, input:focus, textarea:focus { 
-    border-color: var(--accent);
-    box-shadow: 3px 3px 0 var(--border);
-    transform: translate(-1px, -1px);
+    border-color: var(--gold);
+    box-shadow: 0 0 0 4px rgba(179, 155, 125, 0.15);
   }
   button {
-    background: var(--pastel-pink);
-    border: 3px solid var(--border);
+    background: var(--pastel-blush);
+    border: 2px solid var(--border);
     box-shadow: 3px 3px 0 var(--border);
     font-weight: 700;
     cursor: pointer;
+    border-radius: 16px 8px 16px 10px;
   }
   button:hover { 
-    background: #ffc9d6;
+    background: #fadcd3;
     transform: translate(-2px, -2px);
     box-shadow: 5px 5px 0 var(--border);
   }
@@ -169,23 +189,20 @@
   /* Asymmetric Panels */
   .panel {
     background: #ffffff;
-    border: 3px solid var(--border);
-    border-radius: 24px 12px 20px 16px;
+    border: 2px solid var(--border);
+    border-radius: 28px 12px 24px 18px;
     padding: 20px;
-    box-shadow: 6px 6px 0px 0px var(--border);
-    transition: all 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+    box-shadow: 5px 5px 0px 0px var(--border);
   }
   .panel:hover {
     transform: translateY(-2px);
-    box-shadow: 8px 8px 0px 0px var(--border);
+    box-shadow: 7px 7px 0px 0px var(--border);
   }
   .panel h2 {
     margin: 0 0 14px 0;
-    font-family: 'Comfortaa', sans-serif;
-    font-size: 15px;
-    text-transform: uppercase;
-    letter-spacing: 1px;
-    color: var(--muted);
+    font-family: 'Playfair Display', serif;
+    font-size: 18px;
+    color: var(--text);
     font-weight: 700;
   }
 
@@ -196,8 +213,8 @@
   }
   .kv .item {
     background: #ffffff;
-    border: 3px solid var(--border);
-    border-radius: 12px;
+    border: 2px solid var(--border);
+    border-radius: 14px;
     padding: 10px 12px;
     display: flex;
     justify-content: space-between;
@@ -232,7 +249,7 @@
   .tab {
     padding: 8px 14px;
     border-radius: 12px;
-    border: 3px solid var(--border);
+    border: 2px solid var(--border);
     background: #ffffff;
     color: var(--text);
     cursor: pointer;
@@ -241,15 +258,15 @@
     box-shadow: 2px 2px 0 var(--border);
   }
   .tab.active {
-    background: var(--pastel-lavender);
+    background: var(--pastel-sage);
     box-shadow: 4px 4px 0 var(--border);
     transform: translate(-1px, -1px);
   }
 
   /* Code blocks styling */
   .code {
-    background: #2c2937;
-    border: 3px solid var(--border);
+    background: #3b3028;
+    border: 2px solid var(--border);
     border-radius: 16px;
     padding: 16px;
     font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
@@ -257,14 +274,14 @@
     line-height: 1.6;
     overflow-x: auto;
     white-space: pre;
-    color: #ffdae2;
+    color: #faf7f2;
     position: relative;
     box-shadow: 4px 4px 0 var(--border);
   }
-  .code .kw { color: #cca3ff; font-weight: bold; }
-  .code .str { color: #d0f6e9; }
-  .code .num { color: #ffc97a; }
-  .code .cmt { color: #8e8a9f; font-style: italic; }
+  .code .kw { color: #8cbfa5; font-weight: bold; }
+  .code .str { color: #faeaeb; }
+  .code .num { color: #e0be8d; }
+  .code .cmt { color: #7d7065; font-style: italic; }
 
   .copy-btn {
     position: absolute;
@@ -272,7 +289,7 @@
     right: 8px;
     background: #ffffff;
     color: var(--text);
-    border: 3px solid var(--border);
+    border: 2px solid var(--border);
     border-radius: 8px;
     padding: 4px 8px;
     font-size: 11px;
@@ -281,21 +298,21 @@
     box-shadow: 2px 2px 0 var(--border);
   }
   .copy-btn:hover { 
-    background: var(--pastel-blue); 
+    background: var(--gold-light); 
     transform: translate(-1px, -1px);
     box-shadow: 3px 3px 0 var(--border);
   }
 
   .log {
     background: #ffffff;
-    border: 3px solid var(--border);
+    border: 2px solid var(--border);
     border-radius: 16px;
     padding: 16px;
     height: 400px;
     overflow-y: auto;
     font-size: 12px;
     font-family: ui-monospace, Consolas, monospace;
-    box-shadow: inset 2px 2px 0 rgba(0,0,0,0.05);
+    box-shadow: inset 2px 2px 0 rgba(0,0,0,0.02);
   }
   .log-entry {
     padding: 8px;
@@ -317,12 +334,12 @@
     text-align: center;
     box-shadow: 1px 1px 0 var(--border);
   }
-  .log-type.ready { background: var(--pastel-mint); }
-  .log-type.info { background: var(--pastel-blue); }
-  .log-type.error { background: var(--pastel-pink); }
+  .log-type.ready { background: var(--pastel-sage); }
+  .log-type.info { background: var(--pastel-sky); }
+  .log-type.error { background: var(--pastel-blush); }
   .log-type.mqtt { background: var(--pastel-lavender); }
-  .log-type.device { background: var(--pastel-orange); }
-  .log-type.schedule { background: var(--pastel-yellow); }
+  .log-type.device { background: var(--pastel-cream); }
+  .log-type.schedule { background: var(--warn); }
   
   .log-data { 
     color: var(--text); 
@@ -365,7 +382,7 @@
   <header>
     <div class="brand">
       <div class="brandMark">◈</div>
-      <h1>IoTCloud Device Simulator</h1>
+      <h1>IoT<span>Cloud</span> Device Simulator</h1>
       <span class="badge"><span id="statusDot" class="dot off"></span><span id="statusText">Disconnected</span></span>
     </div>
     <div class="controls">
