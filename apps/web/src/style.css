@@ -543,6 +543,10 @@ pre {
   box-shadow: 4px 4px 0 var(--border) !important;
   font-family: monospace !important;
   font-size: 12px !important;
+  max-width: 100% !important;
+  overflow-x: auto !important;
+  white-space: pre-wrap !important;
+  word-break: break-all !important;
 }
 
 .publishPanel label {
@@ -812,6 +816,8 @@ pre {
   padding: 20px;
   border-radius: 20px 10px 24px 12px;
   position: relative;
+  max-width: 100%;
+  overflow-x: hidden;
 }
 .codeCard b {
   font-family: 'Comfortaa', sans-serif;
@@ -852,6 +858,95 @@ pre {
   font-size: 32px;
 }
 
+/* Workflows Layout & Editor Styling */
+.flowCanvas {
+  flex: 1;
+  min-width: 0;
+  height: 100%;
+}
+.editor {
+  display: grid;
+  grid-template-columns: 140px 1fr 280px;
+  height: 100%;
+}
+.nodePalette {
+  border-right: 2px solid var(--border);
+  padding: 16px;
+  background: var(--gold-light);
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.nodePalette b {
+  font-family: 'Comfortaa', sans-serif;
+  font-size: 13px;
+  display: block;
+  margin-bottom: 8px;
+  color: var(--text);
+}
+.nodePalette button {
+  width: 100%;
+  font-size: 11px;
+  padding: 8px 10px;
+  background: #ffffff;
+  border: 2px solid var(--border);
+  border-radius: 10px;
+  cursor: pointer;
+  text-align: left;
+  box-shadow: 2px 2px 0 var(--border);
+}
+.nodePalette button:hover {
+  background: var(--pastel-blush);
+  transform: translate(-1px, -1px);
+  box-shadow: 3px 3px 0 var(--border);
+}
+.inspector .titleInput {
+  font-family: 'Playfair Display', serif;
+  font-size: 18px;
+  font-weight: 700;
+  width: 100%;
+  margin-bottom: 20px;
+  background: transparent;
+  border: none;
+  border-bottom: 2px dashed var(--border);
+  border-radius: 0;
+  padding: 6px 0;
+}
+.inspector .titleInput:focus {
+  border-bottom-style: solid;
+  border-bottom-color: var(--gold);
+  box-shadow: none;
+}
+.inspector b {
+  display: block;
+  font-family: 'Comfortaa', sans-serif;
+  font-size: 12px;
+  color: var(--muted);
+  margin-bottom: 12px;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+.inspector .form label {
+  display: block;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  color: var(--muted);
+  margin-bottom: 12px;
+}
+.inspector .form input {
+  display: block;
+  width: 100%;
+  margin-top: 4px;
+  font-size: 12px;
+  padding: 8px 10px;
+}
+.inspector button.save {
+  width: 100%;
+  margin-top: 24px;
+}
+
 /* Responsive */
 @media (max-width: 1100px) {
   .main { padding: 24px; }
@@ -861,6 +956,7 @@ pre {
   .stream { max-height: 500px; }
   .deviceGrid { grid-template-columns: repeat(2, 1fr); }
   .integration-card-grid { grid-template-columns: repeat(2, 1fr); }
+  .grid3 { grid-template-columns: repeat(2, 1fr); }
 }
 @media (max-width: 760px) {
   .sidebar {

@@ -534,7 +534,13 @@ WebSocket:    <span class="str" id="aiWsUrl">ws://localhost:10000/v1/ws?token=DE
 SSE:          <span class="str" id="aiSseUrl">http://localhost:10000/v1/events?token=DEVICE_TOKEN</span>
 MQTT/WS:      <span class="str" id="aiMqttUrl">ws://localhost:10000/mqtt</span>
 
-Topic:        <span class="str" id="aiTopic">iotcloud/PROJECT_ID/DEVICE_ID/telemetry</span></div>
+Topic:        <span class="str" id="aiTopic">iotcloud/PROJECT_ID/DEVICE_ID/telemetry</span>
+
+<span class="cmt"># Interconnection
+# REST POST /api/device/publish  → broker.publish() → mqtt.message event
+# WebSocket /v1/ws publish action → broker.publish() → mqtt.message event
+# MQTT /mqtt publish            → broker.publish() → mqtt.message event
+# All paths converge at the broker and emit to WS + SSE clients.</span></div>
       </div>
     </section>
   </main>
