@@ -347,32 +347,54 @@ async function runWorkflows(event: Event) {
               return;
             }
 
-            const chatId = node.data?.chatId || c.chatId || c.chat_id;
-            if (!chatId) {
-              console.error('[Telegram Action Error] Missing Chat ID in credential and node config.');
+            const targetRecipient = node.data?.recipient || node.data?.chatId || c.chatId || c.chat_id;
+            let targetChatIds: string[] = [];
+
+            if (targetRecipient === 'all' || targetRecipient === 'broadcast') {
+              if (Array.isArray(c.subscribers) && c.subscribers.length > 0) {
+                targetChatIds = c.subscribers.map((s: any) => String(s.chatId));
+              } else if (c.chatId) {
+                targetChatIds = [String(c.chatId)];
+              }
+            } else if (targetRecipient) {
+              targetChatIds = [String(targetRecipient)];
+            } else if (c.chatId) {
+              targetChatIds = [String(c.chatId)];
+            }
+
+            if (targetChatIds.length === 0) {
+              console.error('[Telegram Action Error] No target Chat IDs or subscribers available.');
               return;
             }
 
-            const res = await fetch(
-              `https://api.telegram.org/bot${c.token}/sendMessage`,
-              {
-                method: 'POST',
-                headers: {
-                  'content-type': 'application/json',
-                },
-                body: JSON.stringify({
-                  chat_id: chatId,
-                  text: render(
-                    node.data?.text ||
-                      JSON.stringify(currentEvent.data),
-                    currentEvent,
-                  ),
-                }),
-              },
+            const messageText = render(
+              node.data?.text || JSON.stringify(currentEvent.data),
+              currentEvent,
             );
 
-            if (!res.ok) {
-              console.error('[Telegram API Error]', res.status, await res.text());
+            for (const chatId of targetChatIds) {
+              try {
+                const res = await fetch(
+                  `https://api.telegram.org/bot${c.token}/sendMessage`,
+                  {
+                    method: 'POST',
+                    headers: { 'content-type': 'application/json' },
+                    body: JSON.stringify({
+                      chat_id: chatId,
+                      text: messageText,
+                      parse_mode: node.data?.parseMode && node.data?.parseMode !== 'None' ? node.data.parseMode : undefined,
+                      disable_notification: Boolean(node.data?.disableNotification),
+                      disable_web_page_preview: Boolean(node.data?.disableWebPagePreview),
+                    }),
+                  },
+                );
+
+                if (!res.ok) {
+                  console.error('[Telegram API Error]', chatId, res.status, await res.text());
+                }
+              } catch (err) {
+                console.error('[Telegram Send Exception]', chatId, err);
+              }
             }
           },
 
@@ -2015,6 +2037,257 @@ app.post(
           error: String(error),
         });
     }
+  },
+);
+
+// --- TELEGRAM SUBSCRIBERS SYNC & MANAGEMENT ---
+
+app.post(
+  '/api/projects/:id/credentials/:credentialId/telegram/sync',
+  {
+    preHandler: (app as any).auth,
+  },
+  async (req: any, reply) => {
+    if (!(await projectOwned(req.params.id, req.user.sub))) {
+      return reply.code(404).send({ error: 'project not found' });
+    }
+
+    const { rows } = await pool.query(
+      `
+        SELECT id, secret
+        FROM credentials
+        WHERE id = $1 AND project_id = $2 AND kind = 'telegram'
+      `,
+      [req.params.credentialId, req.params.id],
+    );
+
+    if (!rows[0]) {
+      return reply.code(404).send({ error: 'Telegram credential not found' });
+    }
+
+    const config = JSON.parse(rows[0].secret);
+    if (!config.token) {
+      return reply.code(400).send({ error: 'Bot Token missing' });
+    }
+
+    const tgRes = await fetch(`https://api.telegram.org/bot${config.token}/getUpdates`);
+    if (!tgRes.ok) {
+      const errText = await tgRes.text();
+      return reply.code(400).send({ error: `Telegram Error: ${errText}` });
+    }
+
+    const data = await tgRes.json();
+    const updates = data.result || [];
+
+    const existingSubscribers: any[] = config.subscribers || [];
+    const subMap = new Map<string, any>();
+    for (const sub of existingSubscribers) {
+      subMap.set(String(sub.chatId), sub);
+    }
+
+    let newCount = 0;
+    for (const u of updates) {
+      const msg = u.message || u.channel_post || u.edited_message || u.callback_query?.message;
+      if (!msg || !msg.chat) continue;
+
+      const chatId = String(msg.chat.id);
+      const username = msg.chat.username || msg.from?.username || '';
+      const firstName = msg.chat.first_name || msg.from?.first_name || '';
+      const lastName = msg.chat.last_name || msg.from?.last_name || '';
+
+      if (!subMap.has(chatId)) {
+        newCount++;
+      }
+
+      subMap.set(chatId, {
+        chatId,
+        username,
+        firstName,
+        lastName,
+        subscribedAt: subMap.get(chatId)?.subscribedAt || new Date().toISOString(),
+      });
+    }
+
+    const updatedSubscribers = Array.from(subMap.values());
+    config.subscribers = updatedSubscribers;
+
+    await pool.query(
+      `
+        UPDATE credentials
+        SET secret = $1
+        WHERE id = $2
+      `,
+      [JSON.stringify(config), req.params.credentialId],
+    );
+
+    return {
+      ok: true,
+      subscribers: updatedSubscribers,
+      newCount,
+      totalCount: updatedSubscribers.length,
+    };
+  },
+);
+
+app.post(
+  '/api/projects/:id/credentials/:credentialId/telegram/subscribers',
+  {
+    preHandler: (app as any).auth,
+  },
+  async (req: any, reply) => {
+    if (!(await projectOwned(req.params.id, req.user.sub))) {
+      return reply.code(404).send({ error: 'project not found' });
+    }
+
+    const { chatId, username, firstName } = req.body || {};
+    if (!chatId) {
+      return reply.code(400).send({ error: 'Chat ID is required' });
+    }
+
+    const { rows } = await pool.query(
+      `
+        SELECT secret
+        FROM credentials
+        WHERE id = $1 AND project_id = $2 AND kind = 'telegram'
+      `,
+      [req.params.credentialId, req.params.id],
+    );
+
+    if (!rows[0]) {
+      return reply.code(404).send({ error: 'Telegram credential not found' });
+    }
+
+    const config = JSON.parse(rows[0].secret);
+    const existing: any[] = config.subscribers || [];
+    const subMap = new Map<string, any>(existing.map(s => [String(s.chatId), s]));
+
+    subMap.set(String(chatId), {
+      chatId: String(chatId),
+      username: username || '',
+      firstName: firstName || 'Subscriber',
+      subscribedAt: new Date().toISOString(),
+    });
+
+    config.subscribers = Array.from(subMap.values());
+
+    await pool.query(
+      `
+        UPDATE credentials
+        SET secret = $1
+        WHERE id = $2
+      `,
+      [JSON.stringify(config), req.params.credentialId],
+    );
+
+    return { ok: true, subscribers: config.subscribers };
+  },
+);
+
+app.delete(
+  '/api/projects/:id/credentials/:credentialId/telegram/subscribers/:targetChatId',
+  {
+    preHandler: (app as any).auth,
+  },
+  async (req: any, reply) => {
+    if (!(await projectOwned(req.params.id, req.user.sub))) {
+      return reply.code(404).send({ error: 'project not found' });
+    }
+
+    const { rows } = await pool.query(
+      `
+        SELECT secret
+        FROM credentials
+        WHERE id = $1 AND project_id = $2 AND kind = 'telegram'
+      `,
+      [req.params.credentialId, req.params.id],
+    );
+
+    if (!rows[0]) {
+      return reply.code(404).send({ error: 'Telegram credential not found' });
+    }
+
+    const config = JSON.parse(rows[0].secret);
+    const existing: any[] = config.subscribers || [];
+    config.subscribers = existing.filter(s => String(s.chatId) !== String(req.params.targetChatId));
+
+    await pool.query(
+      `
+        UPDATE credentials
+        SET secret = $1
+        WHERE id = $2
+      `,
+      [JSON.stringify(config), req.params.credentialId],
+    );
+
+    return { ok: true, subscribers: config.subscribers };
+  },
+);
+
+// Public Webhook for Telegram Bot Auto-Subscription
+app.post(
+  '/v1/telegram/webhook/:credentialId',
+  async (req: any, reply) => {
+    const { credentialId } = req.params;
+    const body = req.body || {};
+
+    const { rows } = await pool.query(
+      `
+        SELECT secret
+        FROM credentials
+        WHERE id = $1 AND kind = 'telegram'
+      `,
+      [credentialId],
+    );
+
+    if (!rows[0]) {
+      return reply.code(404).send({ error: 'Credential not found' });
+    }
+
+    const config = JSON.parse(rows[0].secret);
+    const msg = body.message || body.channel_post || body.edited_message;
+
+    if (msg && msg.chat) {
+      const chatId = String(msg.chat.id);
+      const username = msg.chat.username || msg.from?.username || '';
+      const firstName = msg.chat.first_name || msg.from?.first_name || '';
+      const lastName = msg.chat.last_name || msg.from?.last_name || '';
+
+      const existing: any[] = config.subscribers || [];
+      const subMap = new Map<string, any>(existing.map(s => [String(s.chatId), s]));
+
+      subMap.set(chatId, {
+        chatId,
+        username,
+        firstName,
+        lastName,
+        subscribedAt: subMap.get(chatId)?.subscribedAt || new Date().toISOString(),
+      });
+
+      config.subscribers = Array.from(subMap.values());
+
+      await pool.query(
+        `
+          UPDATE credentials
+          SET secret = $1
+          WHERE id = $2
+        `,
+        [JSON.stringify(config), credentialId],
+      );
+
+      // Auto-reply to user on Telegram
+      if (config.token) {
+        await fetch(`https://api.telegram.org/bot${config.token}/sendMessage`, {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({
+            chat_id: chatId,
+            text: `👋 Hello ${firstName || 'there'}! You are now subscribed to IoTCloud notification alerts. ⚡`,
+          }),
+        }).catch(() => {});
+      }
+    }
+
+    return { ok: true };
   },
 );
 

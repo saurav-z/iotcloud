@@ -554,6 +554,13 @@ function NodeForm({node,setNodes,devices,credentials}:{node:Node;setNodes:any;de
       <label>Data field
         <input value={d.field||''} onChange={e=>update('field',e.target.value)} placeholder="e.g. temperature"/>
       </label>
+      <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap', marginBottom: '12px' }}>
+        {['temperature','humidity','status','battery','voltage','co2'].map(f => (
+          <button key={f} type="button" className="outlineBtn" style={{ fontSize: '10px', padding: '2px 6px', marginTop: 0 }} onClick={() => update('field', f)}>
+            +{f}
+          </button>
+        ))}
+      </div>
       <label>Operator
         <select value={d.operator||'>'} onChange={e=>update('operator',e.target.value)}>
           {OPERATORS.map(op=><option key={op} value={op}>{op}</option>)}
@@ -570,20 +577,92 @@ function NodeForm({node,setNodes,devices,credentials}:{node:Node;setNodes:any;de
     </>}
 
     {/* --- ACTION NODES --- */}
-    {t==='action.telegram.send' && <>
-      <label>Credential
-        <select value={d.credentialId||''} onChange={e=>update('credentialId',e.target.value)}>
-          <option value="">Select Telegram credential...</option>
-          {credentials.filter(c=>c.kind==='telegram').map(c=><option key={c.id} value={c.id}>{c.name}</option>)}
-        </select>
-      </label>
-      <label>Chat ID (Optional override)
-        <input value={d.chatId||''} onChange={e=>update('chatId',e.target.value)} placeholder="e.g. 123456789 (leave blank for credential default)"/>
-      </label>
-      <label>Message template
-        <textarea value={d.text||''} onChange={e=>update('text',e.target.value)} placeholder="Alert: {{data.temperature}}°C from device {{deviceId}}" rows={3}/>
-      </label>
-    </>}
+    {t==='action.telegram.send' && (() => {
+      const selectedCred = credentials.find(c => c.id === d.credentialId);
+      const credSubscribers: any[] = selectedCred?.secret?.subscribers || selectedCred?.config?.subscribers || [];
+      return <>
+        <label>Telegram Credential
+          <select value={d.credentialId||''} onChange={e=>update('credentialId',e.target.value)}>
+            <option value="">Select Telegram credential...</option>
+            {credentials.filter(c=>c.kind==='telegram').map(c=><option key={c.id} value={c.id}>{c.name}</option>)}
+          </select>
+        </label>
+
+        <label>Target Recipient
+          <select
+            value={d.recipient || (d.chatId ? d.chatId : 'all')}
+            onChange={e => {
+              const val = e.target.value;
+              update('recipient', val);
+              if (val !== 'custom') update('chatId', val);
+            }}
+          >
+            <option value="all">📢 Broadcast to All Subscribers ({credSubscribers.length})</option>
+            {credSubscribers.map((s: any) => (
+              <option key={s.chatId} value={s.chatId}>
+                👤 {s.firstName || 'User'} {s.username ? `(@${s.username})` : ''} - ID: {s.chatId}
+              </option>
+            ))}
+            <option value="custom">⚙️ Custom Chat ID (Enter manually)</option>
+          </select>
+        </label>
+
+        {(d.recipient === 'custom' || (!d.recipient && d.chatId && !credSubscribers.some(s => s.chatId === d.chatId))) && (
+          <label>Chat ID (Manual override)
+            <input value={d.chatId||''} onChange={e=>update('chatId',e.target.value)} placeholder="e.g. 123456789 or @mychannel"/>
+          </label>
+        )}
+
+        <label>Message Formatting
+          <select value={d.parseMode||'HTML'} onChange={e=>update('parseMode',e.target.value)}>
+            <option value="HTML">HTML (e.g. &lt;b&gt;bold&lt;/b&gt;, &lt;code&gt;code&lt;/code&gt;)</option>
+            <option value="MarkdownV2">Markdown V2 (*bold*, `code`)</option>
+            <option value="None">Plain Text</option>
+          </select>
+        </label>
+
+        <label>Message Template
+          <textarea
+            value={d.text||''}
+            onChange={e=>update('text',e.target.value)}
+            placeholder="🚨 Alert: <b>{{data.temperature}}°C</b> on device <code>{{deviceId}}</code>"
+            rows={3}
+          />
+        </label>
+
+        <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap', marginBottom: '12px' }}>
+          {['{{data.temperature}}', '{{data.humidity}}', '{{deviceId}}', '{{topic}}', '{{timestamp}}'].map(tag => (
+            <button
+              key={tag}
+              type="button"
+              className="outlineBtn"
+              style={{ fontSize: '10px', padding: '2px 6px', marginTop: 0 }}
+              onClick={() => update('text', (d.text || '') + ' ' + tag)}
+            >
+              +{tag}
+            </button>
+          ))}
+        </div>
+
+        <label className="checkbox-label" style={{ marginTop: '8px' }}>
+          <input
+            type="checkbox"
+            checked={Boolean(d.disableNotification)}
+            onChange={e => update('disableNotification', e.target.checked)}
+          />
+          Send Silently (Disable notification sound)
+        </label>
+
+        <label className="checkbox-label" style={{ marginTop: '6px' }}>
+          <input
+            type="checkbox"
+            checked={Boolean(d.disableWebPagePreview)}
+            onChange={e => update('disableWebPagePreview', e.target.checked)}
+          />
+          Disable Link Previews
+        </label>
+      </>;
+    })()}
 
     {t==='action.discord.send' && <>
       <label>Credential
@@ -660,12 +739,53 @@ function Credentials({project}:{project:any}){
   const[webhookUrl,setWebhookUrl]=useState('');
 
   const[testingId,setTestingId]=useState<string|null>(null);
+  const[syncingId,setSyncingId]=useState<string|null>(null);
+  const[expandedSubscribersId,setExpandedSubscribersId]=useState<string|null>(null);
+  const[manualChatId,setManualChatId]=useState('');
+  const[manualName,setManualName]=useState('');
   const[testResults,setTestResults]=useState<Record<string,string>>({});
   const[error,setError]=useState('');
 
   useEffect(()=>{
     api(`/api/projects/${project.id}/credentials`).then(setItems).catch(()=>{});
   },[project.id]);
+
+  async function syncTelegramSubscribers(credId:string){
+    setSyncingId(credId);
+    try{
+      const res = await api(`/api/projects/${project.id}/credentials/${credId}/telegram/sync`,{method:'POST',body:'{}'});
+      setItems(prev=>prev.map(c=>c.id===credId?{...c,secret:{...c.secret,subscribers:res.subscribers}}:c));
+      alert(`Synced ${res.totalCount} subscribers! (${res.newCount} new)`);
+    }catch(e:any){
+      alert('Sync failed: '+e.message);
+    }finally{
+      setSyncingId(null);
+    }
+  }
+
+  async function addManualSubscriber(credId:string){
+    if(!manualChatId.trim()) return;
+    try{
+      const res = await api(`/api/projects/${project.id}/credentials/${credId}/telegram/subscribers`,{
+        method:'POST',
+        body:JSON.stringify({chatId:manualChatId,firstName:manualName||'Subscriber'})
+      });
+      setItems(prev=>prev.map(c=>c.id===credId?{...c,secret:{...c.secret,subscribers:res.subscribers}}:c));
+      setManualChatId('');
+      setManualName('');
+    }catch(e:any){
+      alert('Failed to add subscriber: '+e.message);
+    }
+  }
+
+  async function removeSubscriber(credId:string,targetChatId:string){
+    try{
+      const res = await api(`/api/projects/${project.id}/credentials/${credId}/telegram/subscribers/${targetChatId}`,{method:'DELETE'});
+      setItems(prev=>prev.map(c=>c.id===credId?{...c,secret:{...c.secret,subscribers:res.subscribers}}:c));
+    }catch(e:any){
+      alert('Failed to remove subscriber: '+e.message);
+    }
+  }
 
   const kinds = [
     { id: 'discord', label: 'Discord', icon: '💬', desc: 'Send rich message webhooks to your discord channels.' },
@@ -737,7 +857,7 @@ function Credentials({project}:{project:any}){
     <div className="pageIntro">
       <div>
         <h2>Credentials Manager</h2>
-        <p>Manage encrypted connectors and secrets safely.</p>
+        <p>Manage encrypted connectors, subscribers, and secrets safely.</p>
       </div>
     </div>
 
@@ -789,114 +909,116 @@ function Credentials({project}:{project:any}){
 
       {step === 2 && (
         <div>
-          <div style={{ fontSize: '14px', fontWeight: 700, color: 'var(--text)', marginBottom: '12px' }}>
-            Configure {kind.toUpperCase()} Connection for <i>"{name}"</i>
-          </div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+            <div style={{ fontSize: '14px', fontWeight: 700, color: 'var(--text)', marginBottom: '12px' }}>
+              Configure {kind.toUpperCase()} Connection for <i>"{name}"</i>
+            </div>
 
-          <div className="credentialFormFields">
-            {kind === 'discord' && (
-              <label>
-                Discord Webhook URL
-                <input
-                  value={discordWebhookUrl}
-                  onChange={e => setDiscordWebhookUrl(e.target.value)}
-                  placeholder="https://discord.com/api/webhooks/..."
-                />
-              </label>
-            )}
-
-            {kind === 'telegram' && (
-              <>
+            <div className="credentialFormFields">
+              {kind === 'discord' && (
                 <label>
-                  Telegram Bot Token
+                  Discord Webhook URL
                   <input
-                    value={telegramToken}
-                    onChange={e => setTelegramToken(e.target.value)}
-                    placeholder="e.g. 123456789:ABCdefGhIJKlmNoPQRsT"
+                    value={discordWebhookUrl}
+                    onChange={e => setDiscordWebhookUrl(e.target.value)}
+                    placeholder="https://discord.com/api/webhooks/..."
                   />
                 </label>
-                <label style={{ marginTop: '12px' }}>
-                  Target Chat ID / Channel ID
-                  <input
-                    value={telegramChatId}
-                    onChange={e => setTelegramChatId(e.target.value)}
-                    placeholder="e.g. 123456789 or @mychannel"
-                  />
-                  <small style={{ display: 'block', color: 'var(--muted)', marginTop: '4px', fontSize: '11px', textTransform: 'none', fontWeight: 500 }}>
-                    💡 <b>Tip:</b> To get your Telegram Chat ID, start a chat with <b>@userinfobot</b> on Telegram.
-                  </small>
-                </label>
-              </>
-            )}
+              )}
 
-            {kind === 'smtp' && (
-              <>
-                <label>
-                  SMTP Server Host
-                  <input
-                    value={smtpHost}
-                    onChange={e => setSmtpHost(e.target.value)}
-                    placeholder="smtp.gmail.com"
-                  />
-                </label>
-                <div style={{ display: 'flex', gap: '16px' }}>
-                  <label style={{ flex: 1 }}>
-                    Port
+              {kind === 'telegram' && (
+                <>
+                  <label>
+                    Telegram Bot Token
                     <input
-                      type="number"
-                      value={smtpPort}
-                      onChange={e => setSmtpPort(e.target.value)}
-                      placeholder="587"
+                      value={telegramToken}
+                      onChange={e => setTelegramToken(e.target.value)}
+                      placeholder="e.g. 123456789:ABCdefGhIJKlmNoPQRsT"
                     />
                   </label>
-                  <label className="checkbox-label" style={{ flex: 1, marginTop: '24px' }}>
+                  <label style={{ marginTop: '12px' }}>
+                    Target Chat ID / Channel ID
                     <input
-                      type="checkbox"
-                      checked={smtpSecure}
-                      onChange={e => setSmtpSecure(e.target.checked)}
+                      value={telegramChatId}
+                      onChange={e => setTelegramChatId(e.target.value)}
+                      placeholder="e.g. 123456789 or @mychannel"
                     />
-                    Use Secure SSL/TLS
+                    <small style={{ display: 'block', color: 'var(--muted)', marginTop: '4px', fontSize: '11px', textTransform: 'none', fontWeight: 500 }}>
+                      💡 <b>Tip:</b> Users can send <code>/start</code> to your Telegram Bot, then click <b>Sync Bot</b> below to auto-collect subscriber Chat IDs!
+                    </small>
                   </label>
-                </div>
+                </>
+              )}
+
+              {kind === 'smtp' && (
+                <>
+                  <label>
+                    SMTP Server Host
+                    <input
+                      value={smtpHost}
+                      onChange={e => setSmtpHost(e.target.value)}
+                      placeholder="smtp.gmail.com"
+                    />
+                  </label>
+                  <div style={{ display: 'flex', gap: '16px' }}>
+                    <label style={{ flex: 1 }}>
+                      Port
+                      <input
+                        type="number"
+                        value={smtpPort}
+                        onChange={e => setSmtpPort(e.target.value)}
+                        placeholder="587"
+                      />
+                    </label>
+                    <label className="checkbox-label" style={{ flex: 1, marginTop: '24px' }}>
+                      <input
+                        type="checkbox"
+                        checked={smtpSecure}
+                        onChange={e => setSmtpSecure(e.target.checked)}
+                      />
+                      Use Secure SSL/TLS
+                    </label>
+                  </div>
+                  <label>
+                    Username
+                    <input
+                      value={smtpUser}
+                      onChange={e => setSmtpUser(e.target.value)}
+                      placeholder="your-email@gmail.com"
+                    />
+                  </label>
+                  <label>
+                    Password
+                    <input
+                      type="password"
+                      value={smtpPass}
+                      onChange={e => setSmtpPass(e.target.value)}
+                      placeholder="SMTP Account Password"
+                    />
+                  </label>
+                </>
+              )}
+
+              {kind === 'webhook' && (
                 <label>
-                  Username
+                  Webhook URL
                   <input
-                    value={smtpUser}
-                    onChange={e => setSmtpUser(e.target.value)}
-                    placeholder="your-email@gmail.com"
+                    value={webhookUrl}
+                    onChange={e => setWebhookUrl(e.target.value)}
+                    placeholder="https://api.myplatform.com/v1/telemetry-receiver"
                   />
                 </label>
-                <label>
-                  Password
-                  <input
-                    type="password"
-                    value={smtpPass}
-                    onChange={e => setSmtpPass(e.target.value)}
-                    placeholder="SMTP Account Password"
-                  />
-                </label>
-              </>
-            )}
+              )}
+            </div>
 
-            {kind === 'webhook' && (
-              <label>
-                Webhook URL
-                <input
-                  value={webhookUrl}
-                  onChange={e => setWebhookUrl(e.target.value)}
-                  placeholder="https://api.myplatform.com/v1/telemetry-receiver"
-                />
-              </label>
-            )}
-          </div>
-
-          <div style={{ display: 'flex', gap: '12px', marginTop: '24px' }}>
-            <button className="outlineBtn" onClick={() => setStep(1)}>
-              ← Back
-            </button>
-            <button className="primary" onClick={createCredential}>
-              Create Connector 🌿
-            </button>
+            <div style={{ display: 'flex', gap: '12px', marginTop: '24px' }}>
+              <button className="outlineBtn" onClick={() => setStep(1)}>
+                ← Back
+              </button>
+              <button className="primary" onClick={createCredential}>
+                Create Connector 🌿
+              </button>
+            </div>
           </div>
         </div>
       )}
@@ -925,7 +1047,87 @@ function Credentials({project}:{project:any}){
               </div>
             )}
 
-            <div style={{ display: 'flex', gap: '8px', marginTop: '6px' }}>
+            {x.kind === 'telegram' && (() => {
+              const subs: any[] = x.secret?.subscribers || x.config?.subscribers || [];
+              const isExpanded = expandedSubscribersId === x.id;
+              return (
+                <div style={{ marginTop: '12px', borderTop: '1px solid var(--border)', paddingTop: '10px' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <button
+                      className="outlineBtn"
+                      style={{ fontSize: '11px', padding: '3px 8px', marginTop: 0 }}
+                      onClick={() => setExpandedSubscribersId(isExpanded ? null : x.id)}
+                    >
+                      👥 {subs.length} Subscribers {isExpanded ? '▲' : '▼'}
+                    </button>
+                    <button
+                      className="primary"
+                      style={{ fontSize: '11px', padding: '3px 8px', marginTop: 0 }}
+                      disabled={syncingId === x.id}
+                      onClick={() => syncTelegramSubscribers(x.id)}
+                    >
+                      {syncingId === x.id ? 'Syncing...' : '🔄 Sync Bot'}
+                    </button>
+                  </div>
+
+                  {isExpanded && (
+                    <div style={{ marginTop: '10px', background: 'var(--panel)', padding: '10px', borderRadius: '8px', border: '1px solid var(--border)' }}>
+                      <b style={{ fontSize: '12px', display: 'block', marginBottom: '4px' }}>Registered Subscribers</b>
+                      <p className="muted" style={{ fontSize: '10px', margin: '0 0 8px' }}>
+                        Users can send <code>/start</code> to your bot, then click <b>Sync Bot</b> above to auto-register.
+                      </p>
+                      {subs.length === 0 ? (
+                        <p className="muted" style={{ fontSize: '11px', margin: '4px 0' }}>
+                          No subscribers registered yet.
+                        </p>
+                      ) : (
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', maxHeight: '160px', overflowY: 'auto' }}>
+                          {subs.map((s: any) => (
+                            <div key={s.chatId} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#fff', padding: '4px 8px', borderRadius: '6px', border: '1px solid var(--border)' }}>
+                              <div>
+                                <b style={{ fontSize: '11px' }}>{s.firstName || 'User'} {s.username ? `(@${s.username})` : ''}</b>
+                                <small style={{ display: 'block', color: 'var(--muted)', fontSize: '10px' }}>ID: {s.chatId}</small>
+                              </div>
+                              <button
+                                className="outlineBtn"
+                                style={{ color: 'var(--error)', borderColor: 'var(--error)', padding: '1px 6px', fontSize: '10px', marginTop: 0 }}
+                                onClick={() => removeSubscriber(x.id, s.chatId)}
+                              >
+                                ✕
+                              </button>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+
+                      <div style={{ marginTop: '10px', display: 'flex', gap: '4px' }}>
+                        <input
+                          style={{ flex: 1, fontSize: '11px', padding: '4px 6px' }}
+                          value={manualChatId}
+                          onChange={e => setManualChatId(e.target.value)}
+                          placeholder="Chat ID"
+                        />
+                        <input
+                          style={{ flex: 1, fontSize: '11px', padding: '4px 6px' }}
+                          value={manualName}
+                          onChange={e => setManualName(e.target.value)}
+                          placeholder="Name / @username"
+                        />
+                        <button
+                          className="outlineBtn"
+                          style={{ fontSize: '11px', padding: '4px 8px', marginTop: 0 }}
+                          onClick={() => addManualSubscriber(x.id)}
+                        >
+                          ＋ Add
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              );
+            })()}
+
+            <div style={{ display: 'flex', gap: '8px', marginTop: '10px' }}>
               <button
                 className="outlineBtn"
                 style={{ flex: 1 }}
