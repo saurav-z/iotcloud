@@ -755,7 +755,11 @@ function Credentials({project}:{project:any}){
     try{
       const res = await api(`/api/projects/${project.id}/credentials/${credId}/telegram/sync`,{method:'POST',body:'{}'});
       setItems(prev=>prev.map(c=>c.id===credId?{...c,secret:{...c.secret,subscribers:res.subscribers}}:c));
-      alert(`Synced ${res.totalCount} subscribers! (${res.newCount} new)`);
+      if (res.webhookActive) {
+        alert(`⚡ Live Webhook is Active!\n\n${res.message}\nTotal Subscribers: ${res.totalCount}`);
+      } else {
+        alert(`Synced ${res.totalCount} subscribers! (${res.newCount} new)`);
+      }
     }catch(e:any){
       alert('Sync failed: '+e.message);
     }finally{
@@ -794,8 +798,19 @@ function Credentials({project}:{project:any}){
         body: JSON.stringify({ webhookUrl: `${apiBase()}/v1/telegram/webhook/${credId}` })
       });
       alert('⚡ ' + (res.message || 'Telegram Webhook Connected Successfully!'));
+      setItems(prev => prev.map(c => c.id === credId ? { ...c, secret: { ...c.secret, webhookUrl: res.webhookUrl } } : c));
     } catch (e: any) {
       alert('Webhook setup failed: ' + e.message);
+    }
+  }
+
+  async function disconnectTelegramWebhook(credId: string) {
+    try {
+      const res = await api(`/api/projects/${project.id}/credentials/${credId}/telegram/delete-webhook`, { method: 'POST', body: '{}' });
+      alert('ℹ️ ' + (res.message || 'Webhook disconnected. Sync mode active!'));
+      setItems(prev => prev.map(c => c.id === credId ? { ...c, secret: { ...c.secret, webhookUrl: undefined } } : c));
+    } catch (e: any) {
+      alert('Disconnect failed: ' + e.message);
     }
   }
 
@@ -1080,6 +1095,7 @@ function Credentials({project}:{project:any}){
 
             {x.kind === 'telegram' && (() => {
               const subs: any[] = x.secret?.subscribers || x.config?.subscribers || [];
+              const hasWebhook = Boolean(x.secret?.webhookUrl || x.config?.webhookUrl);
               const isExpanded = expandedSubscribersId === x.id;
               return (
                 <div style={{ marginTop: '12px', borderTop: '1px solid var(--border)', paddingTop: '10px' }}>
@@ -1094,11 +1110,19 @@ function Credentials({project}:{project:any}){
                     <div style={{ display: 'flex', gap: '4px' }}>
                       <button
                         className="outlineBtn"
-                        style={{ fontSize: '11px', padding: '3px 8px', marginTop: 0 }}
-                        onClick={() => connectTelegramWebhook(x.id)}
-                        title="Connect two-way Telegram Webhook"
+                        style={{ fontSize: '11px', padding: '3px 8px', marginTop: 0, color: hasWebhook ? '#10b981' : undefined, borderColor: hasWebhook ? '#10b981' : undefined }}
+                        onClick={() => {
+                          if (hasWebhook) {
+                            if (confirm('Disconnect Webhook and switch back to manual Sync mode?')) {
+                              disconnectTelegramWebhook(x.id);
+                            }
+                          } else {
+                            connectTelegramWebhook(x.id);
+                          }
+                        }}
+                        title={hasWebhook ? "Webhook is Active! Click to disconnect" : "Connect two-way Telegram Webhook"}
                       >
-                        ⚡ Webhook
+                        {hasWebhook ? '⚡ Webhook (Active)' : '⚡ Connect Webhook'}
                       </button>
                       <button
                         className="primary"

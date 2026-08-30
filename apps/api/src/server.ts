@@ -2091,6 +2091,16 @@ app.post(
     const tgRes = await fetch(`https://api.telegram.org/bot${config.token}/getUpdates`);
     if (!tgRes.ok) {
       const errText = await tgRes.text();
+      if (tgRes.status === 409 || errText.includes('webhook is active')) {
+        return {
+          ok: true,
+          webhookActive: true,
+          message: 'Live Webhook is currently active! Subscribers are automatically registered in real-time whenever they message your bot.',
+          subscribers: config.subscribers || [],
+          newCount: 0,
+          totalCount: (config.subscribers || []).length,
+        };
+      }
       return reply.code(400).send({ error: `Telegram Error: ${errText}` });
     }
 
@@ -2290,6 +2300,56 @@ app.post(
     );
 
     return { ok: true, webhookUrl: targetUrl, message: 'Telegram Webhook connected successfully!' };
+  },
+);
+
+// Delete Telegram Webhook URL to switch back to Long Polling / Sync
+app.post(
+  '/api/projects/:id/credentials/:credentialId/telegram/delete-webhook',
+  {
+    preHandler: (app as any).auth,
+  },
+  async (req: any, reply) => {
+    if (!(await projectOwned(req.params.id, req.user.sub))) {
+      return reply.code(404).send({ error: 'project not found' });
+    }
+
+    const { rows } = await pool.query(
+      `
+        SELECT secret
+        FROM credentials
+        WHERE id = $1 AND project_id = $2 AND kind = 'telegram'
+      `,
+      [req.params.credentialId, req.params.id],
+    );
+
+    if (!rows[0]) {
+      return reply.code(404).send({ error: 'Telegram credential not found' });
+    }
+
+    const config = parseSecret(rows[0].secret);
+    if (!config.token) {
+      return reply.code(400).send({ error: 'Bot Token missing' });
+    }
+
+    const res = await fetch(`https://api.telegram.org/bot${config.token}/deleteWebhook`);
+    const data = await res.json().catch(() => ({ description: 'Failed to delete Telegram webhook' }));
+
+    if (!res.ok || !data.ok) {
+      return reply.code(400).send({ error: data.description || 'Failed to remove Telegram Webhook' });
+    }
+
+    delete config.webhookUrl;
+    await pool.query(
+      `
+        UPDATE credentials
+        SET secret = $1
+        WHERE id = $2
+      `,
+      [formatSecret(config), req.params.credentialId],
+    );
+
+    return { ok: true, message: 'Telegram Webhook disconnected. Manual Sync / Long polling is now active!' };
   },
 );
 
