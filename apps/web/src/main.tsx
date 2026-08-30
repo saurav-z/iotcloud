@@ -17,7 +17,10 @@ function wsBase(){return apiBase().replace(/^https:\/\//i,'wss://')}
 async function api(path:string,opts:RequestInit={}){
   const token=localStorage.getItem('iot_token');
   const base=apiBase();
-  const headers:Record<string,string>={'content-type':'application/json',...(token?{authorization:`Bearer ${token}`}:{})};
+  const headers:Record<string,string>={
+    ...(opts.body ? {'content-type':'application/json'} : {}),
+    ...(token?{authorization:`Bearer ${token}`}:{})
+  };
   Object.entries((opts.headers||{}) as Record<string,string>).forEach(([k,v])=>headers[k]=v);
   const r=await fetch(base+path,{...opts,headers});
   const data=await r.json().catch(()=>({}));
@@ -291,6 +294,19 @@ function Workflows({project,devices}:{project:any;devices:any[]}){
       )}
     </div>
     <div className="flowCanvas">
+      <div className="mobileFlowSelect">
+        <select value={active?.id||''} onChange={e=>{
+          if(e.target.value==='new'){ newWorkflow(); return; }
+          const f=flows.find(x=>x.id===e.target.value);
+          if(f) setActive(f);
+        }}>
+          <option value="" disabled>Choose a workflow...</option>
+          {flows.map(f=><option key={f.id} value={f.id}>{f.name} ({f.enabled?'Enabled':'Draft'})</option>)}
+          <option value="new">＋ Create New Workflow...</option>
+        </select>
+        <button className="primary" onClick={newWorkflow}>＋ New</button>
+      </div>
+
       {active
         ? <WorkflowEditor
             project={project}
@@ -321,6 +337,7 @@ function WorkflowEditor({project,workflow,devices,credentials,onSaved,onDeleted}
   const[edges,setEdges,onEdgesChange]=useEdgesState(initial.edges);
   const[selected,setSelected]=useState<Node|null>(null);
   const[name,setName]=useState(workflow.name||'New workflow');
+  const[mobileTab,setMobileTab]=useState<'nodes'|'canvas'|'inspector'>('canvas');
 
   const addNode=(type:string)=>{
     const allItems=NODE_CATEGORIES.flatMap(c=>c.items);
@@ -333,6 +350,7 @@ function WorkflowEditor({project,workflow,devices,credentials,onSaved,onDeleted}
       data:{label:meta?.label||type}
     };
     setNodes(v=>[...v,newNode]);
+    setMobileTab('canvas');
   };
 
   async function save(){
@@ -353,45 +371,57 @@ function WorkflowEditor({project,workflow,devices,credentials,onSaved,onDeleted}
     onDeleted(workflow.id);
   }
 
-  return <div className="editor">
-    <div className="nodePalette">
-      {NODE_CATEGORIES.map(cat=>
-        <div key={cat.title} className="paletteGroup">
-          <div className="paletteCatTitle">{cat.title}</div>
-          <div className="paletteCatDesc">{cat.desc}</div>
-          {cat.items.map(item=>
-            <button key={item.type} onClick={()=>addNode(item.type)} title={item.desc}>
-              {item.label}
-            </button>
+  return <div className="editorWrapper">
+    <div className="mobileWorkflowTabs">
+      <button className={mobileTab==='nodes'?'active':''} onClick={()=>setMobileTab('nodes')}>🎨 Nodes</button>
+      <button className={mobileTab==='canvas'?'active':''} onClick={()=>setMobileTab('canvas')}>🗺 Canvas</button>
+      <button className={mobileTab==='inspector'?'active':''} onClick={()=>setMobileTab('inspector')}>
+        ⚙ Inspector {selected?'●':''}
+      </button>
+    </div>
+    <div className={`editor showTab-${mobileTab}`}>
+      <div className="nodePalette">
+        {NODE_CATEGORIES.map(cat=>
+          <div key={cat.title} className="paletteGroup">
+            <div className="paletteCatTitle">{cat.title}</div>
+            <div className="paletteCatDesc">{cat.desc}</div>
+            {cat.items.map(item=>
+              <button key={item.type} onClick={()=>addNode(item.type)} title={item.desc}>
+                {item.label}
+              </button>
+            )}
+          </div>
+        )}
+      </div>
+      <div className="rf">
+        <ReactFlow
+          nodes={nodes}
+          edges={edges}
+          onNodesChange={onNodesChange}
+          onEdgesChange={onEdgesChange}
+          onConnect={(c:Connection)=>setEdges(e=>addEdge(c,e))}
+          onNodeClick={(_,n)=>{
+            setSelected(n);
+            setMobileTab('inspector');
+          }}
+          fitView
+        >
+          <Background/><Controls/><MiniMap/>
+        </ReactFlow>
+      </div>
+      <div className="inspector">
+        <input value={name} onChange={e=>setName(e.target.value)} className="titleInput" placeholder="Workflow name"/>
+        <b>Node Inspector</b>
+        {selected
+          ? <NodeForm node={selected} setNodes={setNodes} devices={devices} credentials={credentials}/>
+          : <div className="inspectorHint"><div className="emptyIcon">◌</div><span>Click a node on the canvas to configure it</span></div>
+        }
+        <div style={{display:'flex',gap:'8px',marginTop:'24px'}}>
+          <button className="primary save" style={{flex:1,marginTop:0}} onClick={save}>Save & enable</button>
+          {workflow.id && (
+            <button className="outlineBtn" style={{color:'var(--error)',borderColor:'var(--error)'}} onClick={removeWorkflow}>Delete</button>
           )}
         </div>
-      )}
-    </div>
-    <div className="rf">
-      <ReactFlow
-        nodes={nodes}
-        edges={edges}
-        onNodesChange={onNodesChange}
-        onEdgesChange={onEdgesChange}
-        onConnect={(c:Connection)=>setEdges(e=>addEdge(c,e))}
-        onNodeClick={(_,n)=>setSelected(n)}
-        fitView
-      >
-        <Background/><Controls/><MiniMap/>
-      </ReactFlow>
-    </div>
-    <div className="inspector">
-      <input value={name} onChange={e=>setName(e.target.value)} className="titleInput" placeholder="Workflow name"/>
-      <b>Node Inspector</b>
-      {selected
-        ? <NodeForm node={selected} setNodes={setNodes} devices={devices} credentials={credentials}/>
-        : <div className="inspectorHint"><div className="emptyIcon">◌</div><span>Click a node on the canvas to configure it</span></div>
-      }
-      <div style={{display:'flex',gap:'8px',marginTop:'24px'}}>
-        <button className="primary save" style={{flex:1,marginTop:0}} onClick={save}>Save & enable</button>
-        {workflow.id && (
-          <button className="outlineBtn" style={{color:'var(--error)',borderColor:'var(--error)'}} onClick={removeWorkflow}>Delete</button>
-        )}
       </div>
     </div>
   </div>
