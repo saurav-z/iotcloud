@@ -343,10 +343,17 @@ async function runWorkflows(event: Event) {
             );
 
             if (!c) {
+              console.error('[Telegram Action Error] Credential not found.');
               return;
             }
 
-            await fetch(
+            const chatId = node.data?.chatId || c.chatId || c.chat_id;
+            if (!chatId) {
+              console.error('[Telegram Action Error] Missing Chat ID in credential and node config.');
+              return;
+            }
+
+            const res = await fetch(
               `https://api.telegram.org/bot${c.token}/sendMessage`,
               {
                 method: 'POST',
@@ -354,7 +361,7 @@ async function runWorkflows(event: Event) {
                   'content-type': 'application/json',
                 },
                 body: JSON.stringify({
-                  chat_id: c.chatId,
+                  chat_id: chatId,
                   text: render(
                     node.data?.text ||
                       JSON.stringify(currentEvent.data),
@@ -363,6 +370,10 @@ async function runWorkflows(event: Event) {
                 }),
               },
             );
+
+            if (!res.ok) {
+              console.error('[Telegram API Error]', res.status, await res.text());
+            }
           },
 
           async 'action.discord.send'(node, currentEvent) {
@@ -1944,12 +1955,25 @@ app.post(
           },
         );
       } else if (
-        rows[0].kind ===
-        'telegram'
+        rows[0].kind === 'telegram'
       ) {
-        await fetch(
-          `https://api.telegram.org/bot${config.token}/getMe`,
-        );
+        const chatId = config.chatId || config.chat_id;
+        if (chatId) {
+          const res = await fetch(`https://api.telegram.org/bot${config.token}/sendMessage`, {
+            method: 'POST',
+            headers: { 'content-type': 'application/json' },
+            body: JSON.stringify({ chat_id: chatId, text: '⚡ IoTCloud connection test successfully verified!' }),
+          });
+          if (!res.ok) {
+            const errData = await res.json().catch(() => ({ description: 'Failed to send Telegram test message' }));
+            return reply.code(400).send({ ok: false, error: errData.description || 'Telegram API Error' });
+          }
+        } else {
+          const res = await fetch(`https://api.telegram.org/bot${config.token}/getMe`);
+          if (!res.ok) {
+            return reply.code(400).send({ ok: false, error: 'Invalid Telegram Bot Token' });
+          }
+        }
       } else if (
         rows[0].kind === 'smtp'
       ) {

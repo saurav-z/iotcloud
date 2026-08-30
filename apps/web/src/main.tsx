@@ -577,6 +577,9 @@ function NodeForm({node,setNodes,devices,credentials}:{node:Node;setNodes:any;de
           {credentials.filter(c=>c.kind==='telegram').map(c=><option key={c.id} value={c.id}>{c.name}</option>)}
         </select>
       </label>
+      <label>Chat ID (Optional override)
+        <input value={d.chatId||''} onChange={e=>update('chatId',e.target.value)} placeholder="e.g. 123456789 (leave blank for credential default)"/>
+      </label>
       <label>Message template
         <textarea value={d.text||''} onChange={e=>update('text',e.target.value)} placeholder="Alert: {{data.temperature}}°C from device {{deviceId}}" rows={3}/>
       </label>
@@ -648,6 +651,7 @@ function Credentials({project}:{project:any}){
   // Specific config fields
   const[discordWebhookUrl,setDiscordWebhookUrl]=useState('');
   const[telegramToken,setTelegramToken]=useState('');
+  const[telegramChatId,setTelegramChatId]=useState('');
   const[smtpHost,setSmtpHost]=useState('');
   const[smtpPort,setSmtpPort]=useState('587');
   const[smtpSecure,setSmtpSecure]=useState(false);
@@ -678,7 +682,7 @@ function Credentials({project}:{project:any}){
       configObj = { webhookUrl: discordWebhookUrl };
     } else if (kind === 'telegram') {
       if (!telegramToken) { setError('Bot token is required'); return; }
-      configObj = { token: telegramToken };
+      configObj = { token: telegramToken, chatId: telegramChatId };
     } else if (kind === 'smtp') {
       if (!smtpHost || !smtpPort) { setError('Host and Port are required'); return; }
       configObj = {
@@ -703,6 +707,7 @@ function Credentials({project}:{project:any}){
       setName('');
       setDiscordWebhookUrl('');
       setTelegramToken('');
+      setTelegramChatId('');
       setSmtpHost('');
       setSmtpPort('587');
       setSmtpSecure(false);
@@ -801,14 +806,27 @@ function Credentials({project}:{project:any}){
             )}
 
             {kind === 'telegram' && (
-              <label>
-                Telegram Bot Token
-                <input
-                  value={telegramToken}
-                  onChange={e => setTelegramToken(e.target.value)}
-                  placeholder="e.g. 123456789:ABCdefGhIJKlmNoPQRsT"
-                />
-              </label>
+              <>
+                <label>
+                  Telegram Bot Token
+                  <input
+                    value={telegramToken}
+                    onChange={e => setTelegramToken(e.target.value)}
+                    placeholder="e.g. 123456789:ABCdefGhIJKlmNoPQRsT"
+                  />
+                </label>
+                <label style={{ marginTop: '12px' }}>
+                  Target Chat ID / Channel ID
+                  <input
+                    value={telegramChatId}
+                    onChange={e => setTelegramChatId(e.target.value)}
+                    placeholder="e.g. 123456789 or @mychannel"
+                  />
+                  <small style={{ display: 'block', color: 'var(--muted)', marginTop: '4px', fontSize: '11px', textTransform: 'none', fontWeight: 500 }}>
+                    💡 <b>Tip:</b> To get your Telegram Chat ID, start a chat with <b>@userinfobot</b> on Telegram.
+                  </small>
+                </label>
+              </>
             )}
 
             {kind === 'smtp' && (
