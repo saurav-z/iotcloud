@@ -1994,6 +1994,29 @@ app.post(
   },
 );
 
+app.delete(
+  '/api/projects/:id/credentials/:credentialId',
+  {
+    preHandler: (app as any).auth,
+  },
+  async (req: any, reply) => {
+    if (!(await projectOwned(req.params.id, req.user.sub))) {
+      return reply.code(404).send({ error: 'project not found' });
+    }
+
+    await pool.query(
+      `
+        DELETE FROM credentials
+        WHERE id = $1
+          AND project_id = $2
+      `,
+      [req.params.credentialId, req.params.id],
+    );
+
+    return { ok: true };
+  },
+);
+
 /*
  * ============================================================
  * WEBHOOK

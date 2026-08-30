@@ -221,8 +221,41 @@ function Dashboard({events,connected,devices}:{events:any[];connected:boolean;de
  </div><div className="dashGrid"><section className="panel"><div className="panelHead"><div><b>Recent activity</b><span>Live session</span></div></div>{events.slice(0,8).map((e,i)=><EventRow key={i} e={e}/>)}{!events.length&&<EmptyState text="No events yet."/ >}</section><section className="panel quick"><b>Quick start</b><div className="quickItem"><span>01</span><div><b>Add a device</b><p>Generate a device token and connect MQTT, REST or WebSocket.</p></div></div><div className="quickItem"><span>02</span><div><b>Publish telemetry</b><p>Use Live Events to send a JSON event immediately.</p></div></div><div className="quickItem"><span>03</span><div><b>Automate</b><p>Create workflows that react to incoming events.</p></div></div></section></div></div>
 }
 function Devices({project,devices,setDevices,setProject}:{project:any;devices:any[];setDevices:any;setProject:any}){
- const[name,setName]=useState('');async function add(){if(!name)return;const d=await api(`/api/projects/${project.id}/devices`,{method:'POST',body:JSON.stringify({name})});setDevices([d,...devices]);setName('');setProject({...project,__deviceToken:d.token})}
- return <div><div className="pageIntro"><div><h2>Devices</h2><p>Credentials, presence and endpoints for every device.</p></div><div className="addRow"><input value={name} onChange={e=>setName(e.target.value)} placeholder="New device name"/><button className="primary" onClick={add}>Add device</button></div></div><div className="deviceGrid">{devices.map(d=><div className="deviceCard" key={d.id}><div className="deviceHead"><div className={`deviceDot ${d.online?'on':''}`}/><div><b>{d.name}</b><small>{d.online?'Online':'Offline'} · {d.id.slice(0,8)}</small></div></div><div className="tokenBox"><span>DEVICE TOKEN</span><code>{d.token}</code></div><button className="outlineBtn" onClick={()=>navigator.clipboard?.writeText(d.token)}>Copy token</button></div>)}{!devices.length&&<EmptyState text="No devices yet."/ >}</div></div>
+  const[name,setName]=useState('');
+  async function add(){
+    if(!name)return;
+    const d=await api(`/api/projects/${project.id}/devices`,{method:'POST',body:JSON.stringify({name})});
+    setDevices([d,...devices]);
+    setName('');
+    setProject({...project,__deviceToken:d.token});
+  }
+  async function removeDevice(id:string){
+    if(!confirm('Are you sure you want to delete this device?')) return;
+    await api(`/api/projects/${project.id}/devices/${id}`,{method:'DELETE'});
+    setDevices(devices.filter(d=>d.id!==id));
+  }
+  return <div>
+    <div className="pageIntro">
+      <div><h2>Devices</h2><p>Credentials, presence and endpoints for every device.</p></div>
+      <div className="addRow"><input value={name} onChange={e=>setName(e.target.value)} placeholder="New device name"/><button className="primary" onClick={add}>Add device</button></div>
+    </div>
+    <div className="deviceGrid">
+      {devices.map(d=>
+        <div className="deviceCard" key={d.id}>
+          <div className="deviceHead">
+            <div className={`deviceDot ${d.online?'on':''}`}/>
+            <div><b>{d.name}</b><small>{d.online?'Online':'Offline'} · {d.id.slice(0,8)}</small></div>
+          </div>
+          <div className="tokenBox"><span>DEVICE TOKEN</span><code>{d.token}</code></div>
+          <div style={{display:'flex',gap:'8px',marginTop:'10px'}}>
+            <button className="outlineBtn" style={{flex:1}} onClick={()=>navigator.clipboard?.writeText(d.token)}>Copy token</button>
+            <button className="outlineBtn" style={{color:'var(--error)',borderColor:'var(--error)'}} onClick={()=>removeDevice(d.id)}>Delete</button>
+          </div>
+        </div>
+      )}
+      {!devices.length&&<EmptyState text="No devices yet."/>}
+    </div>
+  </div>
 }
 function Workflows({project,devices}:{project:any;devices:any[]}){
   const[flows,setFlows]=useState<any[]>([]);
@@ -271,6 +304,10 @@ function Workflows({project,devices}:{project:any;devices:any[]}){
               });
               setActive(f);
             }}
+            onDeleted={(id)=>{
+              setFlows(v=>v.filter(x=>x.id!==id));
+              setActive(null);
+            }}
           />
         : <EmptyState text="Select a workflow or create one."/>
       }
@@ -278,7 +315,7 @@ function Workflows({project,devices}:{project:any;devices:any[]}){
   </div>
 }
 
-function WorkflowEditor({project,workflow,devices,credentials,onSaved}:{project:any;workflow:any;devices:any[];credentials:any[];onSaved:(f:any)=>void}){
+function WorkflowEditor({project,workflow,devices,credentials,onSaved,onDeleted}:{project:any;workflow:any;devices:any[];credentials:any[];onSaved:(f:any)=>void;onDeleted:(id:string|null)=>void}){
   const initial=workflow.definition||{nodes:[],edges:[]};
   const[nodes,setNodes,onNodesChange]=useNodesState(initial.nodes);
   const[edges,setEdges,onEdgesChange]=useEdgesState(initial.edges);
@@ -304,6 +341,16 @@ function WorkflowEditor({project,workflow,devices,credentials,onSaved}:{project:
       ? await api(`/api/projects/${project.id}/workflows/${workflow.id}`,{method:'PUT',body:JSON.stringify(body)})
       : await api(`/api/projects/${project.id}/workflows`,{method:'POST',body:JSON.stringify(body)});
     onSaved(f);
+  }
+
+  async function removeWorkflow(){
+    if(!workflow.id){
+      onDeleted(null);
+      return;
+    }
+    if(!confirm(`Are you sure you want to delete "${name}"?`)) return;
+    await api(`/api/projects/${project.id}/workflows/${workflow.id}`,{method:'DELETE'});
+    onDeleted(workflow.id);
   }
 
   return <div className="editor">
@@ -340,7 +387,12 @@ function WorkflowEditor({project,workflow,devices,credentials,onSaved}:{project:
         ? <NodeForm node={selected} setNodes={setNodes} devices={devices} credentials={credentials}/>
         : <div className="inspectorHint"><div className="emptyIcon">◌</div><span>Click a node on the canvas to configure it</span></div>
       }
-      <button className="primary save" onClick={save}>Save & enable workflow</button>
+      <div style={{display:'flex',gap:'8px',marginTop:'24px'}}>
+        <button className="primary save" style={{flex:1,marginTop:0}} onClick={save}>Save & enable</button>
+        {workflow.id && (
+          <button className="outlineBtn" style={{color:'var(--error)',borderColor:'var(--error)'}} onClick={removeWorkflow}>Delete</button>
+        )}
+      </div>
     </div>
   </div>
 }
@@ -744,14 +796,27 @@ function Credentials({project}:{project:any}){
               </div>
             )}
 
-            <button
-              className="outlineBtn"
-              disabled={testingId === x.id}
-              onClick={() => testCredential(x)}
-              style={{ marginTop: '6px' }}
-            >
-              {testingId === x.id ? 'Testing...' : 'Test Connection ⚡'}
-            </button>
+            <div style={{ display: 'flex', gap: '8px', marginTop: '6px' }}>
+              <button
+                className="outlineBtn"
+                style={{ flex: 1 }}
+                disabled={testingId === x.id}
+                onClick={() => testCredential(x)}
+              >
+                {testingId === x.id ? 'Testing...' : 'Test Connection ⚡'}
+              </button>
+              <button
+                className="outlineBtn"
+                style={{ color: 'var(--error)', borderColor: 'var(--error)' }}
+                onClick={async () => {
+                  if (!confirm(`Are you sure you want to delete credential "${x.name}"?`)) return;
+                  await api(`/api/projects/${project.id}/credentials/${x.id}`, { method: 'DELETE' });
+                  setItems(prev => prev.filter(c => c.id !== x.id));
+                }}
+              >
+                Delete
+              </button>
+            </div>
           </div>
         );
       })}
