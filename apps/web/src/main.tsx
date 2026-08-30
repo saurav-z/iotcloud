@@ -335,9 +335,11 @@ function WorkflowEditor({project,workflow,devices,credentials,onSaved,onDeleted}
   const initial=workflow.definition||{nodes:[],edges:[]};
   const[nodes,setNodes,onNodesChange]=useNodesState(initial.nodes);
   const[edges,setEdges,onEdgesChange]=useEdgesState(initial.edges);
-  const[selected,setSelected]=useState<Node|null>(null);
+  const[selectedId,setSelectedId]=useState<string|null>(initial.nodes[0]?.id||null);
   const[name,setName]=useState(workflow.name||'New workflow');
   const[mobileTab,setMobileTab]=useState<'nodes'|'canvas'|'inspector'>('canvas');
+
+  const selected = useMemo(() => nodes.find(n => n.id === selectedId) || null, [nodes, selectedId]);
 
   const addNode=(type:string)=>{
     const allItems=NODE_CATEGORIES.flatMap(c=>c.items);
@@ -350,7 +352,8 @@ function WorkflowEditor({project,workflow,devices,credentials,onSaved,onDeleted}
       data:{label:meta?.label||type}
     };
     setNodes(v=>[...v,newNode]);
-    setMobileTab('canvas');
+    setSelectedId(id);
+    setMobileTab('inspector');
   };
 
   async function save(){
@@ -401,7 +404,7 @@ function WorkflowEditor({project,workflow,devices,credentials,onSaved,onDeleted}
           onEdgesChange={onEdgesChange}
           onConnect={(c:Connection)=>setEdges(e=>addEdge(c,e))}
           onNodeClick={(_,n)=>{
-            setSelected(n);
+            setSelectedId(n.id);
             setMobileTab('inspector');
           }}
           fitView
