@@ -264,30 +264,69 @@ function Workflows({project,devices}:{project:any;devices:any[]}){
   const[flows,setFlows]=useState<any[]>([]);
   const[active,setActive]=useState<any>(null);
   const[credentials,setCredentials]=useState<any[]>([]);
+  
+  // Creation Form State
+  const[creating,setCreating]=useState(false);
+  const[newName,setNewName]=useState('');
+  const[newDeviceId,setNewDeviceId]=useState('');
+  const[creatingLoading,setCreatingLoading]=useState(false);
+
   useEffect(()=>{
     api(`/api/projects/${project.id}/workflows`).then(setFlows).catch(()=>{});
     api(`/api/projects/${project.id}/credentials`).then(setCredentials).catch(()=>{});
   },[project.id]);
 
-  function newWorkflow(){
-    setActive({
-      id:null,
-      name:'New workflow',
-      definition:{
-        nodes:[
-          {id:crypto.randomUUID(),type:'event.trigger',position:{x:80,y:140},data:{label:'Event Input',eventType:'mqtt.message',deviceId:'',topic:''}},
-          {id:crypto.randomUUID(),type:'logic.if',position:{x:380,y:140},data:{label:'IF Condition',field:'temperature',operator:'>',value:'30'}},
+  function startNewWorkflow(){
+    setActive(null);
+    setNewName('');
+    setNewDeviceId('');
+    setCreating(true);
+  }
+
+  async function handleCreateWorkflow(){
+    if(!newName.trim()) return;
+    setCreatingLoading(true);
+    try {
+      const definition = {
+        nodes: [
+          {
+            id: crypto.randomUUID(),
+            type: 'event.trigger',
+            position: { x: 80, y: 140 },
+            data: { label: 'Event Input', eventType: 'mqtt.message', deviceId: newDeviceId, topic: '' }
+          },
+          {
+            id: crypto.randomUUID(),
+            type: 'logic.if',
+            position: { x: 380, y: 140 },
+            data: { label: 'IF Condition', field: 'temperature', operator: '>', value: '30' }
+          }
         ],
-        edges:[]
-      }
-    });
+        edges: []
+      };
+      const created = await api(`/api/projects/${project.id}/workflows`, {
+        method: 'POST',
+        body: JSON.stringify({ name: newName, definition, enabled: true })
+      });
+      setFlows(prev => [created, ...prev]);
+      setActive(created);
+      setCreating(false);
+    } catch (err: any) {
+      alert(err.message || 'Failed to create workflow');
+    } finally {
+      setCreatingLoading(false);
+    }
   }
 
   return <div className="workflowLayout">
     <div className="flowSide">
-      <button className="primary wide" onClick={newWorkflow}>＋ New workflow</button>
+      <button className="primary wide" onClick={startNewWorkflow}>＋ New workflow</button>
       {flows.map(f=>
-        <button className={`flowItem ${active?.id===f.id?'selected':''}`} onClick={()=>setActive(f)} key={f.id}>
+        <button
+          className={`flowItem ${active?.id===f.id?'selected':''}`}
+          onClick={()=>{ setActive(f); setCreating(false); }}
+          key={f.id}
+        >
           <b>{f.name}</b>
           <small>{f.enabled?'Enabled':'Draft'}</small>
         </button>
@@ -295,38 +334,77 @@ function Workflows({project,devices}:{project:any;devices:any[]}){
     </div>
     <div className="flowCanvas">
       <div className="mobileFlowSelect">
-        <select value={active?.id||''} onChange={e=>{
-          if(e.target.value==='new'){ newWorkflow(); return; }
+        <select value={creating?'new':(active?.id||'')} onChange={e=>{
+          if(e.target.value==='new'){ startNewWorkflow(); return; }
           const f=flows.find(x=>x.id===e.target.value);
-          if(f) setActive(f);
+          if(f){ setActive(f); setCreating(false); }
         }}>
           <option value="" disabled>Choose a workflow...</option>
           {flows.map(f=><option key={f.id} value={f.id}>{f.name} ({f.enabled?'Enabled':'Draft'})</option>)}
           <option value="new">＋ Create New Workflow...</option>
         </select>
-        <button className="primary" onClick={newWorkflow}>＋ New</button>
+        <button className="primary" onClick={startNewWorkflow}>＋ New</button>
       </div>
 
-      {active
-        ? <WorkflowEditor
-            project={project}
-            workflow={active}
-            devices={devices}
-            credentials={credentials}
-            onSaved={(f)=>{
-              setFlows((v:any[])=>{
-                const i=v.findIndex(x=>x.id===f.id);
-                return i<0?[f,...v]:v.map(x=>x.id===f.id?f:x);
-              });
-              setActive(f);
-            }}
-            onDeleted={(id)=>{
-              setFlows(v=>v.filter(x=>x.id!==id));
-              setActive(null);
-            }}
-          />
-        : <EmptyState text="Select a workflow or create one."/>
-      }
+      {creating ? (
+        <div className="newWorkflowCard">
+          <h3>Create New Workflow</h3>
+          <p className="muted">Name your workflow and choose a target device to start automating.</p>
+          
+          <label style={{ marginTop: '16px' }}>
+            Workflow Name
+            <input
+              value={newName}
+              onChange={e => setNewName(e.target.value)}
+              placeholder="e.g. High Temp Emergency Alert"
+              autoFocus
+            />
+          </label>
+
+          <label style={{ marginTop: '16px' }}>
+            Initial Device
+            <select value={newDeviceId} onChange={e => setNewDeviceId(e.target.value)}>
+              <option value="">All Devices</option>
+              {devices.map(dev => (
+                <option key={dev.id} value={dev.id}>{dev.name}</option>
+              ))}
+            </select>
+          </label>
+
+          <div style={{ display: 'flex', gap: '10px', marginTop: '24px' }}>
+            <button
+              className="primary"
+              disabled={!newName.trim() || creatingLoading}
+              onClick={handleCreateWorkflow}
+            >
+              {creatingLoading ? 'Creating...' : 'Create Workflow 🌿'}
+            </button>
+            <button className="outlineBtn" onClick={() => setCreating(false)}>
+              Cancel
+            </button>
+          </div>
+        </div>
+      ) : active ? (
+        <WorkflowEditor
+          project={project}
+          workflow={active}
+          devices={devices}
+          credentials={credentials}
+          onSaved={(f)=>{
+            setFlows((v:any[])=>{
+              const i=v.findIndex(x=>x.id===f.id);
+              return i<0?[f,...v]:v.map(x=>x.id===f.id?f:x);
+            });
+            setActive(f);
+          }}
+          onDeleted={(id)=>{
+            setFlows(v=>v.filter(x=>x.id!==id));
+            setActive(null);
+          }}
+        />
+      ) : (
+        <EmptyState text="Select a workflow or create one."/>
+      )}
     </div>
   </div>
 }
