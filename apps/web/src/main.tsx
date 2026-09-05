@@ -164,7 +164,7 @@ function App(){
 function pageTitle(p:string){return ({events:'Live Events',dashboard:'Overview',devices:'Devices',workflows:'Workflow Editor',developer:'Developer Center',settings:'Connection Settings',credentials:'Credentials'} as any)[p]||'IoTCloud'}
 
 function Auth({onLogin}:{onLogin:(t:string)=>void}){
- const[mode,setMode]=useState<'login'|'register'>('register');const[email,setEmail]=useState('');const[pw,setPw]=useState('');const[err,setErr]=useState('');
+ const[mode,setMode]=useState<'login'|'register'>('login');const[email,setEmail]=useState('');const[pw,setPw]=useState('');const[err,setErr]=useState('');
  return <div className="authPage"><div className="authGlow"/><div className="authCard">
   <div className="brand big"><div className="brandMark">◈</div><div>IoT<span>Cloud</span></div></div>
   <div className="authEyebrow">REALTIME IOT INFRASTRUCTURE</div><h1>{mode==='register'?'Build your realtime IoT stack.':'Welcome back.'}</h1>
